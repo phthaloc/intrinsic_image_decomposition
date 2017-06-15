@@ -28,13 +28,13 @@ __status__ = "Development"
 __all__ = ['model']   
 
 
-def model(x,
+def model(inputs,
           training=tf.placeholder(tf.bool),
           dropout_rate=0.5,
           device='/cpu:0'):
     """
-    :param x: input to the network
-    :type x: tf.placeholder with corresponding shape
+    :param inputs: input to the network of form [batch, height, width, channels]
+    :type inputs: tf.placeholder with corresponding shape
     :param training: indicates if network is trained (training -> True) or
         tested/validated (training -> False)
     :param training: np bool or tf bool
@@ -72,8 +72,8 @@ def model(x,
     #                                                         seed=None,
     #                                                         dtype=tf.float32)
     
-    f, s, p, k_in, k_out, name = [12, 4, 'SAME', 3, 96, 'conv1']
-    conv_s11 = cnnhelp.conv2d_layer(x,
+    f, s, p, k_in, k_out, name = [12, 4, 'SAME', 3, 96, 'conv_s1-1']
+    conv_s11 = cnnhelp.conv2d_layer(inputs=inputs,
                                     kernel_shape=[f, f, k_in, k_out],
                                     stride=s,
                                     padding=p,
@@ -84,16 +84,16 @@ def model(x,
                                     relu=True,
                                     device=device)
 
-    f, s, p, name = [2, 2, 'SAME', 'max_pool1']
-    pool_s11 = tf.nn.max_pool(conv_s11, 
+    f, s, p, name = [2, 2, 'SAME', 'max_pool_s1-1']
+    pool_s11 = tf.nn.max_pool(value=conv_s11, 
                               ksize=[1, f, f, 1],
                               strides=[1, s, s, 1],
                               padding=p,
                               name=name)
 
 
-    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 256, 'conv2']
-    conv_s12 = cnnhelp.conv2d_layer(pool_s11,
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 256, 'conv_s1-2']
+    conv_s12 = cnnhelp.conv2d_layer(inputs=pool_s11,
                                     kernel_shape=[f, f, k_in, k_out],
                                     stride=s,
                                     padding=p,
@@ -104,16 +104,16 @@ def model(x,
                                     relu=True,
                                     device=device)
 
-    f, s, p, name = [2, 2, 'SAME', 'max_pool2']
-    pool_s12 = tf.nn.max_pool(conv_s12, 
+    f, s, p, name = [2, 2, 'SAME', 'max_pool_s1-2']
+    pool_s12 = tf.nn.max_pool(value=conv_s12, 
                               ksize=[1, f, f, 1],
                               strides=[1, s, s, 1],
                               padding=p,
                               name=name)
     
 
-    f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 256, 'conv3']
-    conv_s13 = cnnhelp.conv2d_layer(pool_s12,
+    f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 256, 'conv_s1-3']
+    conv_s13 = cnnhelp.conv2d_layer(inputs=pool_s12,
                                     kernel_shape=[f, f, k_in, k_out],
                                     stride=s,
                                     padding=p,
@@ -125,8 +125,8 @@ def model(x,
                                     device=device)
     
 
-    f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 384, 'conv4']
-    conv_s14 = cnnhelp.conv2d_layer(conv_s13,
+    f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 384, 'conv_s1-4']
+    conv_s14 = cnnhelp.conv2d_layer(inputs=conv_s13,
                                     kernel_shape=[f, f, k_in, k_out],
                                     stride=s,
                                     padding=p,
@@ -138,8 +138,8 @@ def model(x,
                                     device=device)
 
 
-    f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 256, 'conv5']
-    conv_s15 = cnnhelp.conv2d_layer(conv_s14,
+    f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 256, 'conv_s1-5']
+    conv_s15 = cnnhelp.conv2d_layer(inputs=conv_s14,
                                     kernel_shape=[f, f, k_in, k_out],
                                     stride=s,
                                     padding=p,
@@ -150,15 +150,15 @@ def model(x,
                                     relu=True,
                                     device=device)
 
-    f, s, p, name = [2, 2, 'SAME', 'max_pool5']
-    pool_s15 = tf.nn.max_pool(conv_s15, 
+    f, s, p, name = [2, 2, 'SAME', 'max_pool_s1-5']
+    pool_s15 = tf.nn.max_pool(value=conv_s15, 
                               ksize=[1, f, f, 1],
                               strides=[1, s, s, 1],
                               padding=p,
                               name=name)
 
 
-    f, s, p, k_in, k_out, name = [16, 8, 'SAME', k_out, 256, 'deconv']
+    f, s, p, k_in, k_out, name = [16, 8, 'SAME', k_out, 256, 'deconv_s1']
     # filter: A 4-D Tensor with the same type as value and shape [height, width,
     # output_channels, in_channels]. filter's in_channels dimension must match
     # that of value.
@@ -186,32 +186,144 @@ def model(x,
                                            name=name,
                                            reuse=None)
 
-    # dropout (apply dropout after activation):
-    with tf.variable_scope('fc1/'):
-        # To reduce overfitting, we will apply dropout before the readout layer.
-        # We create a placeholder for the probability that a neuron's output is
-        # kept during dropout -> keep_prob \elem (0,1]. This allows us to turn
-        # dropout on during training (keep_prob \elem (0,1)), and turn it off
-        # during testing (keep_prop = 1).
-        # keep_prob = tf.placeholder(tf.float32)
-        # fc1_drop = tf.nn.dropout(x=fc1, keep_prob=keep_prob, noise_shape=None,
-        #                          seed=None, name='fc1_dropout')
-        # or alternatively use:
-        # here rate is the dropout rate, between 0 and 1. E.g. "rate=0.1" would
-        # drop out 10% of input units.
-        fc1_drop = tf.layers.dropout(inputs=fc1, rate=dropout_rate,
-                                     noise_shape=None, seed=None,
-                                     training=training,
-                                     name='fc1_dropout')
-        nnhelp._activation_summary(fc1_drop)
-    # last layer (contains predictions, do not apply a relu activation (-> use
-    # linear activation instead):)
-    # for the last layer we use a Xavier (uniform=True) weight initialization,
-    # because we apply softmax later
-    weights_initializer = tf.truncated_normal_initializer(stddev=0.1)
-    # weights_initializer = tf.contrib.layers.xavier_initializer(uniform=False,
-    #                                                            seed=None,
-    #                                                            dtype=tf.float32)
+
+    f, s, p, k_in, k_out, name = [1, 1, 'VALID', k_out, 64, 'conv_s1-6']
+    conv_s16 = cnnhelp.conv2d_layer(inputs=deconv_s1,
+                                    kernel_shape=[f, f, k_in, k_out],
+                                    stride=s,
+                                    padding=p,
+                                    name_conv_layer=name,
+                                    weights_initializer=weights_initializer,
+                                    use_bn=True,
+                                    training=training,
+                                    relu=True,
+                                    device=device)
+
+    ############################################################################
+    # scale 2:
+    f, s, p, k_in, k_out, name = [10, 2, 'SAME', 3, 96, 'conv_s2-1']
+    conv_s21 = cnnhelp.conv2d_layer(inputs=inputs,
+                                    kernel_shape=[f, f, k_in, k_out],
+                                    stride=s,
+                                    padding=p,
+                                    name_conv_layer=name,
+                                    weights_initializer=weights_initializer,
+                                    use_bn=True,
+                                    training=training,
+                                    relu=True,
+                                    device=device)
+
+    f, s, p, name = [2, 2, 'SAME', 'max_pool_s2-1']
+    pool_s21 = tf.nn.max_pool(value=conv_s21, 
+                              ksize=[1, f, f, 1],
+                              strides=[1, s, s, 1],
+                              padding=p,
+                              name=name)
 
 
-    return
+    concat = tf.concat(values=[pool_s21, conv_s16], axis=-1, name='concat')
+
+    
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-2']
+    conv_s22 = cnnhelp.conv2d_layer(inputs=concat,
+                                    kernel_shape=[f, f, k_in, k_out],
+                                    stride=s,
+                                    padding=p,
+                                    name_conv_layer=name,
+                                    weights_initializer=weights_initializer,
+                                    use_bn=True,
+                                    training=training,
+                                    relu=True,
+                                    device=device)
+
+
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-3']
+    conv_s23 = cnnhelp.conv2d_layer(inputs=conv_s22,
+                                    kernel_shape=[f, f, k_in, k_out],
+                                    stride=s,
+                                    padding=p,
+                                    name_conv_layer=name,
+                                    weights_initializer=weights_initializer,
+                                    use_bn=True,
+                                    training=training,
+                                    relu=True,
+                                    device=device)
+    
+
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-4']
+    conv_s24 = cnnhelp.conv2d_layer(inputs=conv_s23,
+                                    kernel_shape=[f, f, k_in, k_out],
+                                    stride=s,
+                                    padding=p,
+                                    name_conv_layer=name,
+                                    weights_initializer=weights_initializer,
+                                    use_bn=True,
+                                    training=training,
+                                    relu=True,
+                                    device=device)
+
+
+    # albedo:
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-5_albedo']
+    conv_s25_albedo = cnnhelp.conv2d_layer(inputs=conv_s24,
+                                           kernel_shape=[f, f, k_in, k_out],
+                                           stride=s,
+                                           padding=p,
+                                           name_conv_layer=name,
+                                           weights_initializer=weights_initializer,
+                                           use_bn=True,
+                                           training=training,
+                                           relu=True,
+                                           device=device)
+
+    f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2_albedo']
+    deconv_s2_albedo = tf.layers.conv2d_transpose(inputs=conv_s25_albedo,
+                                                  filters=k_out,
+                                                  kernel_size=f,
+                                                  strides=s,
+                                                  padding=p,
+                                                  data_format='channels_last',
+                                                  activation=None,
+                                                  use_bias=True,
+                                                  kernel_initializer=None,
+                                                  bias_initializer=tf.zeros_initializer(),
+                                                  kernel_regularizer=weights_initializer,
+                                                  bias_regularizer=None,
+                                                  activity_regularizer=None,
+                                                  trainable=True,
+                                                  name=name,
+                                                  reuse=None)
+
+
+    # shading:
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-5_shading']
+    conv_s25_shading = cnnhelp.conv2d_layer(inputs=conv_s24,
+                                            kernel_shape=[f, f, k_in, k_out],
+                                            stride=s,
+                                            padding=p,
+                                            name_conv_layer=name,
+                                            weights_initializer=weights_initializer,
+                                            use_bn=True,
+                                            training=training,
+                                            relu=True,
+                                            device=device)
+
+    f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2_shading']
+    deconv_s2_shading = tf.layers.conv2d_transpose(inputs=conv_s25_shading,
+                                                   filters=k_out,
+                                                   kernel_size=f,
+                                                   strides=s,
+                                                   padding=p,
+                                                   data_format='channels_last',
+                                                   activation=None,
+                                                   use_bias=True,
+                                                   kernel_initializer=None,
+                                                   bias_initializer=tf.zeros_initializer(),
+                                                   kernel_regularizer=weights_initializer,
+                                                   bias_regularizer=None,
+                                                   activity_regularizer=None,
+                                                   trainable=True,
+                                                   name=name,
+                                                   reuse=None)
+    return deconv_s2_albedo, deconv_s2_shading
+
