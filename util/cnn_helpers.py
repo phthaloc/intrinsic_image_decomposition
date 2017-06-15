@@ -46,6 +46,13 @@ def conv2d_layer(inputs,
             with stride_height=stride_width=stride (int)
         padding: zero padding: VALID: no padding, SAME (default): with padding
             (tf detects automatically how many zeros have to be padded) (str)
+            padding=='SAME': padding == "SAME": output_spatial_shape[i] =
+            ceil(input_spatial_shape[i] / strides[i])
+            padding=='VALID': output_spatial_shape[i] =
+            ceil((input_spatial_shape[i] - (spatial_filter_shape[i]-1) *
+            dilation_rate[i]) / strides[i])
+            for more details see:
+            https://www.tensorflow.org/api_docs/python/tf/nn/convolution
         name_conv_layer: name of convolutional (or input/output) layer (str,
             default: 'hidden')
         weights_initializer: initializer for weight variable (NOTICE: It is
