@@ -175,5 +175,5 @@ def conv2d_layer(inputs,
     #     weights/biases/activations:
     tf.summary.histogram(name=kernel.op.name, values=kernel)
     tf.summary.histogram(name=biases.op.name, values=biases)
-    return act, kernel
+    return act
 
