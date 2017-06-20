@@ -360,9 +360,7 @@ class SintelDataInputQueue(DataInputQueue):
                 self.random_crop_images_and_labels(image_and_labels=[images, 
                                                                      labels_albedo,
                                                                      labels_shading],
-                                                   channels=[image_shape[-1],
-                                                             image_shape[-1],
-                                                             image_shape[-1]],
+                                                   channels=[image_shape[-1]]*3,
                                                    spatial_shape=image_shape[:2],
                                                    data_augmentation=data_augmentation)
         
