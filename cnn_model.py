@@ -5,7 +5,7 @@ Module that contains the CNN model!
 """
 
 import sys
-sys.path.append('/Users/udodehm/workspace/kaggle/util')
+sys.path.append('./util')
 
 import tensorflow as tf
 from math import sqrt
@@ -30,7 +30,6 @@ __all__ = ['model']
 
 def model(inputs,
           training=tf.placeholder(tf.bool),
-          dropout_rate=0.5,
           device='/cpu:0'):
     """
     :param inputs: input to the network of form [batch, height, width, channels]
@@ -38,9 +37,6 @@ def model(inputs,
     :param training: indicates if network is trained (training -> True) or
         tested/validated (training -> False)
     :param training: np bool or tf bool
-    :param dropout_rate: probability that a neuron's output is kept during
-        dropout (only during training):
-    :type dropout_rate: float (\elem (0, 1])
     :param device: device where to save variables: e.g. standard cpu: '/cpu:0',
         standard gpu: '/gpu:0' (default: '/cpu:0')
     :type device: str
@@ -83,6 +79,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s11)
 
     f, s, p, name = [2, 2, 'SAME', 'max_pool_s1-1']
     pool_s11 = tf.nn.max_pool(value=conv_s11, 
@@ -91,6 +88,7 @@ def model(inputs,
                               padding=p,
                               name=name)
 
+    print(pool_s11)
 
     f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 256, 'conv_s1-2']
     conv_s12 = cnnhelp.conv2d_layer(inputs=pool_s11,
@@ -103,6 +101,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s12)
 
     f, s, p, name = [2, 2, 'SAME', 'max_pool_s1-2']
     pool_s12 = tf.nn.max_pool(value=conv_s12, 
@@ -110,6 +109,7 @@ def model(inputs,
                               strides=[1, s, s, 1],
                               padding=p,
                               name=name)
+    print(pool_s12)
     
 
     f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 256, 'conv_s1-3']
@@ -123,6 +123,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s13)
     
 
     f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 384, 'conv_s1-4']
@@ -136,6 +137,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s14)
 
 
     f, s, p, k_in, k_out, name = [3, 1, 'SAME', k_out, 256, 'conv_s1-5']
@@ -149,6 +151,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s15)
 
     f, s, p, name = [2, 2, 'SAME', 'max_pool_s1-5']
     pool_s15 = tf.nn.max_pool(value=conv_s15, 
@@ -156,6 +159,7 @@ def model(inputs,
                               strides=[1, s, s, 1],
                               padding=p,
                               name=name)
+    print(pool_s15)
 
 
     f, s, p, k_in, k_out, name = [16, 8, 'SAME', k_out, 256, 'deconv_s1']
@@ -179,12 +183,13 @@ def model(inputs,
                                            use_bias=True,
                                            kernel_initializer=None,
                                            bias_initializer=tf.zeros_initializer(),
-                                           kernel_regularizer=weights_initializer,
+                                           kernel_regularizer=None,
                                            bias_regularizer=None,
                                            activity_regularizer=None,
                                            trainable=True,
                                            name=name,
                                            reuse=None)
+    print(deconv_s1)
 
 
     f, s, p, k_in, k_out, name = [1, 1, 'VALID', k_out, 64, 'conv_s1-6']
@@ -198,6 +203,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s16)
 
     ############################################################################
     # scale 2:
@@ -212,6 +218,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s21)
 
     f, s, p, name = [2, 2, 'SAME', 'max_pool_s2-1']
     pool_s21 = tf.nn.max_pool(value=conv_s21, 
@@ -219,12 +226,14 @@ def model(inputs,
                               strides=[1, s, s, 1],
                               padding=p,
                               name=name)
+    print(pool_s21)
 
 
     concat = tf.concat(values=[pool_s21, conv_s16], axis=-1, name='concat')
+    print(concat)
 
     
-    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-2']
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out + 64, 64, 'conv_s2-2']
     conv_s22 = cnnhelp.conv2d_layer(inputs=concat,
                                     kernel_shape=[f, f, k_in, k_out],
                                     stride=s,
@@ -235,6 +244,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s22)
 
 
     f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-3']
@@ -248,6 +258,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s23)
     
 
     f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-4']
@@ -261,6 +272,7 @@ def model(inputs,
                                     training=training,
                                     relu=True,
                                     device=device)
+    print(conv_s24)
 
 
     # albedo:
@@ -275,6 +287,7 @@ def model(inputs,
                                            training=training,
                                            relu=True,
                                            device=device)
+    print(conv_s25_albedo)
 
     f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2_albedo']
     deconv_s2_albedo = tf.layers.conv2d_transpose(inputs=conv_s25_albedo,
@@ -287,16 +300,17 @@ def model(inputs,
                                                   use_bias=True,
                                                   kernel_initializer=None,
                                                   bias_initializer=tf.zeros_initializer(),
-                                                  kernel_regularizer=weights_initializer,
+                                                  kernel_regularizer=None,
                                                   bias_regularizer=None,
                                                   activity_regularizer=None,
                                                   trainable=True,
                                                   name=name,
                                                   reuse=None)
+    print(deconv_s2_albedo)
 
 
     # shading:
-    f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv_s2-5_shading']
+    f, s, p, k_in, k_out, name = [5, 1, 'SAME', 64, 64, 'conv_s2-5_shading']
     conv_s25_shading = cnnhelp.conv2d_layer(inputs=conv_s24,
                                             kernel_shape=[f, f, k_in, k_out],
                                             stride=s,
@@ -307,6 +321,7 @@ def model(inputs,
                                             training=training,
                                             relu=True,
                                             device=device)
+    print(conv_s25_shading)
 
     f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2_shading']
     deconv_s2_shading = tf.layers.conv2d_transpose(inputs=conv_s25_shading,
@@ -319,11 +334,12 @@ def model(inputs,
                                                    use_bias=True,
                                                    kernel_initializer=None,
                                                    bias_initializer=tf.zeros_initializer(),
-                                                   kernel_regularizer=weights_initializer,
+                                                   kernel_regularizer=None,
                                                    bias_regularizer=None,
                                                    activity_regularizer=None,
                                                    trainable=True,
                                                    name=name,
                                                    reuse=None)
+    print(deconv_s2_shading)
     return deconv_s2_albedo, deconv_s2_shading
 
