@@ -352,9 +352,9 @@ class SintelDataInputQueue(DataInputQueue):
                 shading_label_path = self.read_csv_file(record_defaults=[[''],
                                                                          [''],
                                                                          ['']])
-        images = self.read_image(image_path)
-        labels_albedo = self.read_image(albedo_label_path)
-        labels_shading = self.read_image(shading_label_path)
+        images = self.read_image(image_path=image_path)
+        labels_albedo = self.read_image(image_path=albedo_label_path)
+        labels_shading = self.read_image(image_path=shading_label_path)
 
         images, labels_albedo, labels_shading = \
                 self.random_crop_images_and_labels(image_and_labels=[images, 
