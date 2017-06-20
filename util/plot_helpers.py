@@ -4,9 +4,8 @@
 Usefull functions for plotting
 """                                              
                                                  
-import tensorflow as tf                          
-import nn_helpers as nnhelp                      
-                                                 
+import matplotlib.pyplot as plt
+
 __author__ = "Udo Dehm"                          
 __copyright__ = "Copyright 2017"                 
 __credits__ = ["Udo Dehm"]                       
