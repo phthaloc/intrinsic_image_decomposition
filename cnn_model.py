@@ -25,12 +25,12 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
 
-__all__ = ['model']   
+__all__ = ['model_narihira2015']   
 
 
-def model(inputs,
-          training=tf.placeholder(tf.bool),
-          device='/cpu:0'):
+def model_narihira2015(inputs,
+                       training=tf.placeholder(tf.bool),
+                       device='/cpu:0'):
     """
     :param inputs: input to the network of form [batch, height, width, channels]
     :type inputs: tf.placeholder with corresponding shape
@@ -289,7 +289,7 @@ def model(inputs,
                                            device=device)
     print(conv_s25_albedo)
 
-    f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2_albedo']
+    f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2out_albedo']
     deconv_s2_albedo = tf.layers.conv2d_transpose(inputs=conv_s25_albedo,
                                                   filters=k_out,
                                                   kernel_size=f,
@@ -323,7 +323,7 @@ def model(inputs,
                                             device=device)
     print(conv_s25_shading)
 
-    f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2_shading']
+    f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3, 'deconv_s2out_shading']
     deconv_s2_shading = tf.layers.conv2d_transpose(inputs=conv_s25_shading,
                                                    filters=k_out,
                                                    kernel_size=f,
@@ -342,4 +342,92 @@ def model(inputs,
                                                    reuse=None)
     print(deconv_s2_shading)
     return deconv_s2_albedo, deconv_s2_shading
+
+
+def create_inference_graph(save_path, device='/cpu:0'):
+    """
+    Create an inference graph (defined above): A complete neural network that
+    (ONLY) can do inference (forward pass). 
+    It contains a graph from input to output of the network.
+    It does not contain a loss function and optimization ops (which are
+    necessary for backpropagation / learning).
+    These operations have to be included after loading the model.
+
+    Until now, the model which is created is hard coded.
+    ATTENTION: be careful creating model from jupyter file because
+    of saving properties!
+    to be sure it would be best to save models from a python script (update: if
+    kernel is restarted, it works quite fine in jupyter)
+    :param save_path: path where the tensorflow (inference) graph should be
+        saved
+    :type device: str
+    :param device: device where to save variables: e.g. standard cpu: '/cpu:0',
+        standard gpu: '/gpu:0' (default: '/cpu:0')
+    :type device: str
+    :return: nothing
+    """
+    # make sure we start with a new, empty graph before building it:
+    tf.reset_default_graph()
+
+    # setup input placeholders with the shape=None (we do not want to save fixed
+    # image sizes because we might enter different image dimenstions into the
+    # network. But ATTENTION: we need to be careful which dimensions we add to
+    # the network because the network (first convolution layer can only handle
+    # certain dimensions):
+    x = tf.placeholder(dtype=tf.float32, shape=None, name='input') 
+    # We want to create summaries that give us outputs (TensorFlow ops that
+    # output protocol buffers containing 'summarized' data) of images, e.g. to
+    # check right formating of input images (tf.summary.images()) display some
+    # input data in tensorboard under summary image:
+    # (images are built from tensor which must be 4-D with shape
+    # [batch_size, height, width, channels] where
+    # channels \elem {1 ->grayscale, 3 -> rgb, 4 -> rgba}. 
+    # max_outputs: Max number of batch elements to generate images for)
+    tf.summary.image(name='input', tensor=x, max_outputs=3, collections=None)
+
+    # bool variable that indicates if we are in training mode (training=True) or
+    # valid/test mode (training=False) this indicator is important if dropout
+    # or/and batch normalization is used.
+    training = tf.placeholder(tf.bool, name='is_training')
+
+    # define model in a separate function:
+    model_out = model_narihira2015(inputs=x, training=training, device=device)
+
+    # to get every summary defined above we merge them to get one target:
+    merge_train_summaries = tf.summary.merge_all()
+
+    # define a FileWriter op which writes summaries defined above to disk:
+    summary_writer = tf.summary.FileWriter(save_path)
+
+    # Op that initializes global variables in the graph:
+    init_global = tf.global_variables_initializer()
+
+    # Create a saver.
+    saver = tf.train.Saver()
+    # Generates MetaGraphDef (this is the important saving operation. it saves
+    # the inference graph!):
+    saver.export_meta_graph(save_path + 'tfmodel_inference.meta')
+
+    with tf.Session() as sess:
+        # initialize all variables:
+        sess.run([init_global])
+        # Adds a Graph to the event file. 
+        # create summary that give output (TensorFlow op that output protocol
+        # buffers containing 'summarized' data) of the built Tensorflow graph:
+        summary_writer.add_graph(sess.graph)
+                                                       
+        # # Runs to network output:
+        # feed_dict = {x: np.random.random([1] + IMAGE_SHAPE), training: False}
+        # model_output = sess.run(model_out, feed_dict=feed_dict)
+        # s = sess.run(merge_train_summaries, feed_dict=feed_dict)
+        # summary_writer.add_summary(summary=s)
+
+        # # this saves data:
+        # saver.save(sess, save_path + 'tfmodel_inference')
+        # return model_output
+
+
+if __name__ == "__main__":
+    create_inference_graph(save_path='logs/1_inference/', device='/cpu:0')
+
 
