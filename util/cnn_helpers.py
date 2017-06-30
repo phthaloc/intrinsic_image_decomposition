@@ -17,7 +17,7 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
 
-__all__ = ['conv2d_layer'] 
+__all__ = ['conv2d_layer', 'loss_fct'] 
 
 
 def conv2d_layer(inputs,
@@ -177,3 +177,32 @@ def conv2d_layer(inputs,
     tf.summary.histogram(name=biases.op.name, values=biases)
     return act
 
+
+def loss_fct(label_albedo,
+             label_shading,
+             prediction_albedo,
+             prediction_shading,
+             lambda_):
+    """
+    Computes loss function (it compares ground truth (labels) to predictions
+    y)
+    """
+    with tf.name_scope('loss'):
+        mse_alb = tf.reduce_mean(tf.square(prediction_albedo - label_albedo))
+        reduced_alb = tf.square(tf.reduce_mean(prediction_albedo - label_albedo))
+
+        mse_shad = tf.reduce_mean(tf.square(prediction_shading - label_shading))
+        reduced_shad = tf.square(tf.reduce_mean(prediction_shading - label_shading))
+
+        # least square loss if lambda_ = 0, scale invariant loss if
+        # lambda_ = 1, average of both if lambda_ = 0.5:
+        loss = (mse_alb - lambda_ * reduced_alb) + (mse_shad - lambda_ * reduced_shad)
+        # create summaries that give outputs (TensorFlow ops that output
+        # protocol buffers containing 'summarized' data) of some scalar 
+        # parameters, like evolution of loss function (how does it change 
+        # over time? / rather not weights  because there are usually several
+        # of them) etc (tf.summary.scalar())
+        # (have a look at parameters that change over time (= training
+        # steps))
+        tf.summary.scalar(name='loss', tensor=loss)
+    return loss
