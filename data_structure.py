@@ -82,14 +82,14 @@ def create_datasets(df, p_train, p_valid, p_test, sample=True):
         df_valid_sample = pd.DataFrame()
         df_test_sample = pd.DataFrame()
     # print info:
-    print(f'data set cardinalities:\n' +
-          f'    # complete data set: {len(df)}\n' +
-          f'    # training data set: {len(df_train)}\n' +
-          f'    # validation data set: {len(df_valid)}\n' +
-          f'    # testing data set: {len(df_test)}\n' +
-          f'    # sample training data set: {len(df_train_sample)}\n' +
-          f'    # sample validation data set: {len(df_valid_sample)}\n' +
-          f'    # sample testing data set: {len(df_test_sample)}'
+    print('data set cardinalities:\n' +
+          '    # complete data set: {}\n'.format(len(df)) +
+          '    # training data set: {}\n'.format(len(df_train)) +
+          '    # validation data set: {}\n'.format(len(df_valid)) +
+          '    # testing data set: {}\n'.format(len(df_test)) +
+          '    # sample training data set: {}\n'.format(len(df_train_sample)) +
+          '    # sample validation data set: {}\n'.format(len(df_valid_sample))+
+          '    # sample testing data set: {}'.format(len(df_test_sample))
           )
     return (df_train, df_valid, df_test, df_train_sample, df_valid_sample,
             df_test_sample)
@@ -165,7 +165,8 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
     elif data_set == 'mpi_sintel_complete':
         data_dir_sintel = data_dir + 'mpi-sintel-complete/'
 
-        download.maybe_download_and_extract(url=url_sintel_complete, download_dir=data_dir_sintel)
+        download.maybe_download_and_extract(url=url_sintel_complete,
+                                            download_dir=data_dir_sintel)
 
         if create_csv_lists:
             # use 'clean pass' images (see narihira2015: p.3: "'final images'
@@ -176,30 +177,53 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                                        ] for x in glob.glob(data_dir_sintel + 'training/clean/**/*.png')],
                                      columns=['image_path', 'label_path'])
 
-            # get training validation and testing data set of the mpi-sintel data:
+            # get training validation and testing data set of the mpi-sintel
+            # data:
             df_sintel_train, df_sintel_valid, df_sintel_test, \
-            df_sintel_train_sample, df_sintel_valid_sample, df_sintel_test_sample = create_datasets(df=df_sintel,
-                                                                                                    p_train=0.8,
-                                                                                                    p_valid=0.1,
-                                                                                                    p_test=0.1,
-                                                                                                    sample=True)
+                df_sintel_train_sample, df_sintel_valid_sample, \
+                df_sintel_test_sample = create_datasets(df=df_sintel,
+                                                        p_train=0.8,
+                                                        p_valid=0.1,
+                                                        p_test=0.1,
+                                                        sample=True)
 
-            # save complete data set, training data set, validation data set and testing data set in separate data files:
-            df_sintel.to_csv(path_or_buf=data_dir + 'data_sintel_complete_complete.csv', sep=',',
-                             columns=['image_path', 'label_path'], index=False, header=False)
-            df_sintel_train.to_csv(path_or_buf=data_dir + 'data_sintel_complete_train.csv', sep=',',
-                                   columns=['image_path', 'label_path'], index=False, header=False)
-            df_sintel_valid.to_csv(path_or_buf=data_dir + 'data_sintel_complete_valid.csv', sep=',',
-                                   columns=['image_path', 'label_path'], index=False, header=False)
-            df_sintel_test.to_csv(path_or_buf=data_dir + 'data_sintel_complete_test.csv', sep=',',
-                                  columns=['image_path', 'label_path'], index=False, header=False)
+            # save complete data set, training data set, validation data set and
+            # testing data set in separate data files:
+            df_sintel.to_csv(path_or_buf=data_dir + 'data_sintel_complete_complete.csv',
+                             sep=',',
+                             columns=['image_path', 'label_path'],
+                             index=False,
+                             header=False)
+            df_sintel_train.to_csv(path_or_buf=data_dir + 'data_sintel_complete_train.csv',
+                                   sep=',',
+                                   columns=['image_path', 'label_path'],
+                                   index=False,
+                                   header=False)
+            df_sintel_valid.to_csv(path_or_buf=data_dir + 'data_sintel_complete_valid.csv',
+                                   sep=',',
+                                   columns=['image_path', 'label_path'],
+                                   index=False,
+                                   header=False)
+            df_sintel_test.to_csv(path_or_buf=data_dir + 'data_sintel_complete_test.csv',
+                                  sep=',',
+                                  columns=['image_path', 'label_path'],
+                                  index=False,
+                                  header=False)
 
-            df_sintel_train_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_train.csv', sep=',',
-                                          columns=['image_path', 'label_path'], index=False, header=False)
-            df_sintel_valid_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_valid.csv', sep=',',
-                                          columns=['image_path', 'label_path'], index=False, header=False)
-            df_sintel_test_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_test.csv', sep=',',
-                                         columns=['image_path', 'label_path'], index=False, header=False)
+            df_sintel_train_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_train.csv',
+                                          sep=',',
+                                          columns=['image_path', 'label_path'],
+                                          index=False,
+                                          header=False)
+            df_sintel_valid_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_valid.csv',
+                                          sep=',',
+                                          columns=['image_path', 'label_path'],
+                                          index=False,
+                                          header=False)
+            df_sintel_test_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_test.csv',
+                                         sep=',',
+                                         columns=['image_path', 'label_path'],
+                                         index=False, header=False)
 
             # also save (unknown) test files:
             df_sintel_test_unknown = pd.DataFrame([[os.path.relpath(x, data_dir),
@@ -221,9 +245,12 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
         data_dir_sintel = data_dir + 'mpi-sintel-shading/'
 
         # maybe download data if necessary:
-        download.maybe_download_and_extract(url=url_sintel_images, download_dir=data_dir + 'mpi-sintel-shading/')
-        download.maybe_download_and_extract(url=url_sintel_albedo, download_dir=data_dir + 'mpi-sintel-shading/')
-        download.maybe_download_and_extract(url=url_sintel_shading, download_dir=data_dir + 'mpi-sintel-shading/')
+        download.maybe_download_and_extract(url=url_sintel_images,
+                                            download_dir=data_dir + 'mpi-sintel-shading/')
+        download.maybe_download_and_extract(url=url_sintel_albedo,
+                                            download_dir=data_dir + 'mpi-sintel-shading/')
+        download.maybe_download_and_extract(url=url_sintel_shading,
+                                            download_dir=data_dir + 'mpi-sintel-shading/')
 
         if create_csv_lists:
             # import images and labels separateley:
@@ -271,35 +298,51 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
             # get training validation and testing data set of the mpi-sintel
             # data:
             df_sintel_train2, df_sintel_valid2, df_sintel_test2, \
-            df_sintel_train_sample2, df_sintel_valid_sample2, df_sintel_test_sample2 = create_datasets(df=df_sintel2,
-                                                                                                       p_train=0.8,
-                                                                                                       p_valid=0.1,
-                                                                                                       p_test=0.1,
-                                                                                                       sample=True)
+                df_sintel_train_sample2, df_sintel_valid_sample2, \
+                df_sintel_test_sample2 = create_datasets(df=df_sintel2,
+                                                         p_train=0.8,
+                                                         p_valid=0.1,
+                                                         p_test=0.1,
+                                                         sample=True)
 
-            # save complete data set, training data set, validation data set and testing data set in separate data files:
-            df_sintel2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_complete.csv', sep=',',
-                              columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            # save complete data set, training data set, validation data set and
+            # testing data set in separate data files:
+            df_sintel2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_complete.csv',
+                              sep=',',
+                              columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                              index=False,
                               header=False)
-            df_sintel_train2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_train.csv', sep=',',
-                                    columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            df_sintel_train2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_train.csv',
+                                    sep=',',
+                                    columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                    index=False,
                                     header=False)
-            df_sintel_valid2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_valid.csv', sep=',',
-                                    columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            df_sintel_valid2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_valid.csv',
+                                    sep=',',
+                                    columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                    index=False,
                                     header=False)
-            df_sintel_test2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_test.csv', sep=',',
-                                   columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            df_sintel_test2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_test.csv',
+                                   sep=',',
+                                   columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                   index=False,
                                    header=False)
 
-            df_sintel_train_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_train.csv', sep=',',
+            df_sintel_train_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_train.csv',
+                                           sep=',',
                                            columns=['image_path', 'albedo_label_path', 'shading_label_path'],
-                                           index=False, header=False)
-            df_sintel_valid_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_valid.csv', sep=',',
+                                           index=False,
+                                           header=False)
+            df_sintel_valid_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_valid.csv',
+                                           sep=',',
                                            columns=['image_path', 'albedo_label_path', 'shading_label_path'],
-                                           index=False, header=False)
-            df_sintel_test_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_test.csv', sep=',',
+                                           index=False,
+                                           header=False)
+            df_sintel_test_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_test.csv',
+                                          sep=',',
                                           columns=['image_path', 'albedo_label_path', 'shading_label_path'],
-                                          index=False, header=False)
+                                          index=False,
+                                          header=False)
 
     elif data_set == 'mit':
         data_dir_mit = data_dir + 'MIT-intrinsic/data/'
@@ -315,32 +358,48 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                                   columns=['image_path', 'albedo_label_path', 'shading_label_path'])
 
             # get training validation and testing data set of the mit data:
-            df_mit_train, df_mit_valid, df_mit_test, _, _, _ = create_datasets(df=df_mit, p_train=0.8,
-                                                                               p_valid=0.1, p_test=0.1, sample=False)
+            df_mit_train, df_mit_valid, df_mit_test, _, _, \
+                _ = create_datasets(df=df_mit, p_train=0.8,
+                                    p_valid=0.1, p_test=0.1, sample=False)
 
-            # save complete data set, training data set, validation data set and testing data set in separate data files:
-            df_mit.to_csv(path_or_buf=data_dir + 'data_mit_complete.csv', sep=',',
-                          columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False, header=False)
-            df_mit_train.to_csv(path_or_buf=data_dir + 'data_mit_train.csv', sep=',',
-                                columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            # save complete data set, training data set, validation data set and
+            # testing data set in separate data files:
+            df_mit.to_csv(path_or_buf=data_dir + 'data_mit_complete.csv',
+                          sep=',',
+                          columns=['image_path', 'albedo_label_path',
+                                   'shading_label_path'],
+                          index=False,
+                          header=False)
+            df_mit_train.to_csv(path_or_buf=data_dir + 'data_mit_train.csv',
+                                sep=',',
+                                columns=['image_path', 'albedo_label_path',
+                                         'shading_label_path'],
+                                index=False,
                                 header=False)
-            df_mit_valid.to_csv(path_or_buf=data_dir + 'data_mit_valid.csv', sep=',',
-                                columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            df_mit_valid.to_csv(path_or_buf=data_dir + 'data_mit_valid.csv',
+                                sep=',',
+                                columns=['image_path', 'albedo_label_path',
+                                         'shading_label_path'],
+                                index=False,
                                 header=False)
-            df_mit_test.to_csv(path_or_buf=data_dir + 'data_mit_test.csv', sep=',',
-                               columns=['image_path', 'albedo_label_path', 'shading_label_path'], index=False,
+            df_mit_test.to_csv(path_or_buf=data_dir + 'data_mit_test.csv',
+                               sep=',',
+                               columns=['image_path', 'albedo_label_path',
+                                        'shading_label_path'],
+                               index=False,
                                header=False)
     else:
-        raise ValueError("data_set must be in ['iiw', 'mpi_sintel_shading', 'mpi_sintel_complete', 'mit']")
+        raise ValueError("data_set must be in ['iiw', 'mpi_sintel_shading', " +
+                         "'mpi_sintel_complete', 'mit']")
 
 
 if __name__ == '__main__':
     # directory where to save csv files:
-    data_dir = 'data1/'
+    data_dir = 'data/'
 
-    main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
+    # main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
     main(data_set='mpi_sintel_shading', data_dir=data_dir,
          create_csv_lists=True)
-    main(data_set='mpi_sintel_complete', data_dir=data_dir,
-         create_csv_lists=True)
-    main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
+    # main(data_set='mpi_sintel_complete', data_dir=data_dir,
+    #      create_csv_lists=True)
+    # main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
