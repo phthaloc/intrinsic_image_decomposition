@@ -34,11 +34,9 @@ import time
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-import matplotlib.pyplot as plt
 
 import input_queues as iq
 import cnn_model
-import plot_helpers as plt_help
 import general_helpers as ghelp
 import cnn_helpers as cnnhelp
 
@@ -47,7 +45,7 @@ print('Tensorflow version: \n' + tf.__version__)
 
 # data path constants:
 # DATA_DIR = '../data/mnist/'
-DATA_DIR = 'data/'
+DATA_DIR = '/usr/udo/data/'
 PREDICT_PATH = ''
 path_inference_graph = ['logs/inference_graphs/narihira2015/' +
                         'tfmodel_inference.meta']
@@ -66,18 +64,18 @@ INITIAL_LEARNING_RATE = 1e-5
 # probability that a neuron's output is kept during dropout (only during 
 # training!!!, testing/validation -> 1.0):
 # DROPOUT_RATE = 0.5
-BATCH_SIZE = 16  # nr of data which is put through the network before updating 
+BATCH_SIZE = 8  # nr of data which is put through the network before updating 
     # it, as default use: 32. 
 # BATCH_SIZE determines how many data samples are loaded in the memory (be 
 # careful with memory space)
-NUM_EPOCHS = 16  # nr of times the training process loops through the 
+NUM_EPOCHS = 2  # nr of times the training process loops through the 
     # complete training data set (how often is the tr set 'seen')
     # if you have 1000 training examples, and your batch size is 500, then it
     # will take 2 iterations to complete 1 epoch.
 
-DISPLAY_STEP = 100  # every DIPLAY_STEP'th training iteration information is 
+DISPLAY_STEP = 2  # every DIPLAY_STEP'th training iteration information is 
     # printed (default: 100)
-SUMMARY_STEP = 32  # every SUMMARY_STEP'th training iteration a summary file is 
+SUMMARY_STEP = 2  # every SUMMARY_STEP'th training iteration a summary file is 
     # written to LOGS_PATH
 DEVICE = '/gpu:0'  # device on which the variable is saved/processed
 
@@ -110,7 +108,7 @@ graph = tf.get_default_graph()
 
 with tf.name_scope('data'):
     # import training data set
-    file = 'data_sintel_shading_train.csv'
+    file = 'sample_data_sintel_shading_train.csv'
     data_train = iq.SintelDataInputQueue(path_csv_file = DATA_DIR + file,
                                          batch_size=BATCH_SIZE, 
                                          num_epochs=NUM_EPOCHS, 
@@ -126,7 +124,7 @@ with tf.name_scope('data'):
     # - limited memory space.
     #  -> After each training epoch we will use the complete validation dataset
     #     to calculate the error/accuracy on the validation set
-    file = 'data_sintel_shading_valid.csv'
+    file = 'sample_data_sintel_shading_valid.csv'
     data_valid = iq.SintelDataInputQueue(path_csv_file = DATA_DIR + file,
                                          batch_size=5, 
                                          num_epochs=NUM_EPOCHS,
