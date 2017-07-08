@@ -12,7 +12,6 @@ import time
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
 import input_queues as iq
 import cnn_model
 import plot_helpers as plt_help
@@ -50,7 +49,7 @@ BATCH_SIZE = 8  # nr of data which is put through the network before updating
     # it, as default use: 32. 
 # BATCH_SIZE determines how many data samples are loaded in the memory (be 
 # careful with memory space)
-NUM_EPOCHS = 3  # nr of times the training process loops through the 
+NUM_EPOCHS = 20  # nr of times the training process loops through the 
     # complete training data set (how often is the tr set 'seen')
     # if you have 1000 training examples, and your batch size is 500, then it
     # will take 2 iterations to complete 1 epoch.
@@ -59,10 +58,10 @@ DISPLAY_STEP = 2  # every DIPLAY_STEP'th training iteration information is
     # printed (default: 100)
 SUMMARY_STEP = 2  # every SUMMARY_STEP'th training iteration a summary file is 
     # written to LOGS_PATH
-DEVICE = '/cpu:0'  # device on which the variable is saved/processed
+DEVICE = '/gpu:0'  # device on which the variable is saved/processed
 
 
-# In[12]:
+# In[2]:
 
 
 with tf.name_scope('data'):
@@ -105,7 +104,7 @@ with tf.name_scope('data'):
     # deg and randomly horizontally flipped:
     data_te_out = data_test.next_batch(image_shape=IMAGE_SHAPE,
                                        data_augmentation=False)
-    image_path_batch_test, albedo_path_batch_test, shading_path_batch_test, images_batch_test, albedo_batch_test, shading_batch_test = data_te_out
+    image_path_batch_test, albedo_path_batch_test, shading_path_batch_test,         images_batch_test, albedo_batch_test, shading_batch_test = data_te_out
     
     # for the test set create also 
     image_path_test, albedo_label_path_test, shading_label_path_test = data_test.read_csv_file(record_defaults=[[''], [''], ['']])
@@ -121,7 +120,7 @@ with tf.name_scope('data'):
                                                                                                    data_augmentation=False)
 
 
-# In[ ]:
+# In[3]:
 
 
 # with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
@@ -147,19 +146,14 @@ with tf.Session() as sess:
     
     iters = int(data_test.nr_data / data_test.batch_size * 
                       data_test.num_epochs)
-    print('available iterations: ' + iters)
+    print('available iterations: ' + str(iters))
     iters_used = int(NUM_EPOCHS * 0.75)
-    print('used iterations: ' + iters_used)
+    print('used iterations: ' + str(iters_used))
     
-    for i in range(iters_used):
-        nxt_img_path_batch_te, nxt_albedo_path_batch_te, \
-            nxt_shad_path_batch_te, nxt_img_batch_te, nxt_albedo_batch_te, \
-            nxt_shad_batch_te = sess.run([image_path_batch_test,
-                                          albedo_path_batch_test, 
-                                          shading_path_batch_test,
-                                          images_batch_test, 
-                                          albedo_batch_test,
-                                          shading_batch_test])
+    for i in range(iters):
+        nxt_img_path_batch_te, nxt_albedo_path_batch_te, nxt_shad_path_batch_te, nxt_img_batch_te, nxt_albedo_batch_te, nxt_shad_batch_te = sess.run([image_path_batch_test, albedo_path_batch_test, 
+                          shading_path_batch_test, images_batch_test, 
+                          albedo_batch_test, shading_batch_test])
         print(nxt_img_path_batch_te)
 #     ############################################################################
 #     # Training:
@@ -197,6 +191,5 @@ with tf.Session() as sess:
     
     coord.request_stop()
     coord.join(threads)
-
 
 

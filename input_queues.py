@@ -59,13 +59,18 @@ class DataInputQueue(object):
             self.nr_data = int(sum(1 for line in open(self.path_csv_file)))
 
 
-    def read_csv_file(self, record_defaults=[[''], ['']]):
+    def read_csv_file(self, shuffle=False, record_defaults=[[''], ['']]):
         """
         Builds a file name queue of rows contained in a .csv data list file
         ('*_data_list.csv').  Then it decodes each row and outputs each row in a
         queue. Each row consists of two columns (image path and label)
         :param record_defaults: default value for each column in the csv file if
             one column value is empty in the csv file
+        :param shuffle: csv file is read and saved in a queue with method
+            tf.train.string-input_producer(). Elements in the queue could be
+            shuffled before they are saved. This is recommended when using
+            method self.input_shuffle_batch_small_data_sets() (default: False)
+        :type shuffle: boolean 
         :return: queue of image path and label from a .csv data list file in tf
             tensor form
         """
@@ -74,7 +79,7 @@ class DataInputQueue(object):
         # file with file names and labels:
         filename_queue = tf.train.string_input_producer(string_tensor=[self.path_csv_file],
                                                         num_epochs=self.num_epochs,
-                                                        shuffle=False, 
+                                                        shuffle=shuffle, 
                                                         seed=None,
                                                         capacity=32,
                                                         shared_name=None,
@@ -196,8 +201,8 @@ class DataInputQueue(object):
         # following function is defined simultaneously (then not all 
         # iterations through the data set might be possible in the queue).
         # -> iterations through the batches should work like expected
-        min_after_dequeue = 10000
-        num_threads = 4
+        min_after_dequeue = 5000
+        num_threads = 2
         capacity = min_after_dequeue + (num_threads + 1) * self.batch_size
         batch_list = tf.train.shuffle_batch(tensors=tensors,
                                             batch_size=self.batch_size,
@@ -206,6 +211,31 @@ class DataInputQueue(object):
                                             min_after_dequeue=min_after_dequeue,
                                             name='shuffle_batch_'+self.path_csv_file.split('/')[-1]
                                            )
+        return batch_list
+
+    def input_shuffle_batch_small_data_sets(self, tensors):
+        """
+        Takes tf tensor objects images (preferably created with method
+        self.read_image()) and labels (preferably created with method
+        self.read_csv_file()) and creates NOT shuffled (mini) batches.
+        ATTENTION: use shuffle=True in self.read_csv_file() method.
+        :param tensors: list with tf tensorflow objects that should be
+            summarized in a shuffled batch
+        :type tensors: list of tf tensor objects
+        :return: tf image batches and tf label batches
+        """
+        # http://stackoverflow.com/questions/39283605/regarding-the-use-of-tf-train-shuffle-batch-to-create-batches:
+        batch_list = tf.train.batch(tensors=tensors,
+                                    batch_size=self.batch_size,
+                                    num_threads=1,
+                                    capacity=32,
+                                    enqueue_many=False,
+                                    shapes=None,
+                                    dynamic_pad=False,
+                                    allow_smaller_final_batch=False,
+                                    shared_name=None,
+                                    name='shuffle_batch_'+self.path_csv_file.split('/')[-1]
+                                   )
         return batch_list
 
     @abc.abstractmethod
@@ -349,7 +379,8 @@ class SintelDataInputQueue(DataInputQueue):
         :return: tf image batches and tf label batches
         """
         image_path, albedo_label_path, \
-                shading_label_path = self.read_csv_file(record_defaults=[[''],
+                shading_label_path = self.read_csv_file(shuffle=True,
+                                                        record_defaults=[[''],
                                                                          [''],
                                                                          ['']])
         images = self.read_image(image_path=image_path)
@@ -368,12 +399,12 @@ class SintelDataInputQueue(DataInputQueue):
 #                                                 shading_label_path, images,
 #                                                 labels_albedo, labels_shading])
 
-        return_lst = self.input_shuffle_batch(tensors=[image_path,
-                                                       albedo_label_path,
-                                                       shading_label_path,
-                                                       images,
-                                                       labels_albedo,
-                                                       labels_shading])
+        return_lst = self.input_shuffle_batch_small_data_sets(tensors=[image_path,
+                                                                       albedo_label_path,
+                                                                       shading_label_path,
+                                                                       images,
+                                                                       labels_albedo,
+                                                                       labels_shading])
         image_path_batch, albedo_label_path_batch, shading_label_path_batch, \
             images_batch, labels_albedo_batch, labels_shading_batch = return_lst
 
