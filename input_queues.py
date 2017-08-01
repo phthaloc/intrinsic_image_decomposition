@@ -483,6 +483,7 @@ class DataQueue:
         self.completed_epochs = 0
         self.num_epochs = num_epochs
         self.iter_left = int(self.df.shape[0] / self.batch_size) * self.num_epochs
+        self.num_iter = 0
 
     def dequeue(self):
         """
@@ -507,6 +508,7 @@ class DataQueue:
         self.df_queue.drop(df_batch.index, inplace=True)
         # lower number of available iterations:
         self.iter_left -= 1
+        self.num_iter += 1
         return df_batch
 
 
