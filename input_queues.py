@@ -10,6 +10,10 @@ import numpy as np
 import typing
 import tensorflow as tf
 import abc
+import scipy as sp
+import scipy.misc
+import scipy.ndimage
+
 
 __author__ = "Udo Dehm"
 __copyright__ = "Copyright 2017"
@@ -20,6 +24,8 @@ __maintainer__ = "Udo Dehm"
 __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
+__all__ = ['SintelDataInputQueue', 'DataInputQueue', 'next_batch',
+           'process_image', 'DataQueue']
  
 class DataInputQueue(object):
     def __init__(self,
@@ -432,4 +438,189 @@ class SintelDataInputQueue(DataInputQueue):
                 images_batch,
                 labels_albedo_batch,
                 labels_shading_batch)
+
+
+class DataQueue:
+    """
+    Base class of ImageQueue, which constructs a shuffled queue of image paths
+    (strings) from a given directory without replacement. Once the queue is
+    "exhausted", the isExhausted flag returns False, indicating the end of an
+    epoch.  The queue then automatically refills itself. "Exhausted" refers to
+    the point where dequeue() is called and there are not enough images left in
+    the queue after that to satisfy the batch size,
+    The remaining images are therefore ignored.
+    :param name: Name of the queue.
+    :param dir: Directory containing the images.
+    :param batch_size: The batch size to be used during training.
+
+    Variables:
+    :param base: The list of image paths. Stays constant after constructed.
+    :param queue: The queue (list) of image paths.
+
+    Note: This user-friendly custom queue has several advantages over the
+    regular Tensorflow method (for example in the CIFAR-10 example code), where
+    two queues are required (a string_input_producer which returns image paths
+    and a batch shuffler that stores a definable number of images as 4D Tensors
+    and returns a batch in each training step). In contrast, this queue:
+    1. simply stores and outputs a list of image paths. These strings are then
+       read by read_image_batch_png() in each training step, so that space for
+       only one image batch Tensor needs to be preallocated, saving precious
+       memory.
+    2. returns a flag to indicate the end of an epoch instead of an Exception.
+       More importantly, it is able to refill itself, whereas Tensorflow Queues
+       do not once the desired number of epochs are achieved.
+    The slight disadvantage is that the queue has to be explicitly dequeued and
+    the strings have to be fed into the model in each training step.
+    """
+
+    def __init__(self, df, batch_size, num_epochs):
+        self.df = df
+        # build the shuffled starting queue:
+        self.df_queue = self.df.sample(frac=1)
+        # batch size determines how many rows of the DataFrame are droped at
+        # once in method dequeue:
+        self.batch_size = batch_size
+        self.completed_epochs = 0
+        self.num_epochs = num_epochs
+        self.iter_left = int(self.df.shape[0] / self.batch_size) * self.num_epochs
+
+    def dequeue(self):
+        """
+        When called once, returns:
+            batch: A list of image paths according to batch_size.
+            isExhausted: Flag indicating if an epoch is achieved.
+        """
+        # check if we already reached one full epoch (^= all data is dequeued
+        # once):
+        if ((self.df_queue.shape[0] < self.batch_size) and
+                (self.completed_epochs <= self.num_epochs)):
+            # then start a new epoch
+            self.df_queue = self.df.sample(frac=1)
+            self.completed_epochs += 1
+
+        if (self.completed_epochs + 1) > self.num_epochs:
+            raise IndexError('{} complete '.format(self.num_epochs) +
+                             'epochs have already been dequeued. No more ' +
+                             'data available')
+
+        df_batch = self.df_queue.tail(self.batch_size)
+        self.df_queue.drop(df_batch.index, inplace=True)
+        # lower number of available iterations:
+        self.iter_left -= 1
+        return df_batch
+
+
+def process_image(image, is_flip=True, is_rotated=True, output_shape=None,
+                  norm=True):
+    """
+    Takes an image-like numpy array and processes it if desired.
+    Possible process steps (in this order) are randomly horizontal flipping,
+    rotating the image spatially with angle between [-15, 15] deg, randomly
+    cropping the image to output_shape.
+    :param image: an image-like numpy array with shape [height, width, channels]
+        image-like means that we can use in-depth stacked images (eg. channels=9
+        for 3 stacked images) to perform the same processing steps
+        simultaneously on all stacked images.
+    :type image: np.array of shape [height, width, channels]
+    :param is_flip: flag for randomly flipping image horizontally
+    :type is_flip: bool (default: True)
+    :param is_rotated: flag for randomly rotating image by random angle in range
+        [-15, 15] deg
+    :type is_rotated: bool (default: True)
+    :param output_shape: Spatial output shape of the image/stacked images.
+    :type output_shape: If output_shape=None (default) the output image/stacked
+        images have the same shape as the input image, otherwise output_shape
+        must be of type list with at least len(output_shape)==2 elements. The
+        output image will have shape
+        [output_shape[0], output_shape[1], channels] (where channels = input
+        channels)
+    :param norm: norm images to [0, 1] range.
+    :type norm: boolean (default: True)
+    :return: processed np.array image
+    ATTENTION: image rotation (function sp.ndimage.interpolation.rotate() and
+        underlying function sp.ndimage._nd_image.geometric_transform() take
+        by far most of the time)
+    """
+    # flip image horizontally randomly:
+    if is_flip:
+        # bool random number which decides if images should be flipped
+        # horizontally:
+        is_flip = np.random.choice([False, True], p=[0.5, 0.5])
+        # flip image:
+        img = image[:, ::-1]
+
+    # rotate image by angle degrees:
+    if is_rotated:
+        # angle in degrees:
+        angle = np.random.normal(loc=0, scale=15 / 2)
+        img = sp.ndimage.interpolation.rotate(input=img, angle=angle,
+                                              axes=(1, 0), reshape=False,
+                                              output=None, order=3,
+                                              mode='constant', cval=0.0,
+                                              prefilter=True)
+
+    # randomly crop image to output shape:
+    if output_shape:
+        y_start = np.random.randint(img.shape[0] - output_shape[0])
+        x_start = np.random.randint(img.shape[1] - output_shape[1])
+        img = img[y_start:y_start + output_shape[0],
+              x_start:x_start + output_shape[1], :]
+
+    if norm:
+        img = img / 255
+
+    return img
+
+
+def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
+    """
+    Generates a new processed batch of images and labels each time it is
+    called (if a DataQueue.dequeue() object is passed).
+    :param deq: typically a DataQueue.dequeue() object which outputs a
+        batch of data in form of a pd.DataFrame() which contains paths
+        of all images and labels.
+    :type deq: DataQueue.dequeue() object
+    :param shape: Spatial output shape of the image/stacked images.
+    :type shape: If output_shape=None (default) the output image/stacked
+        images have the same shape as the input image, otherwise output_shape
+        must be of type list with at least len(output_shape)==2 elements. The
+        output image will have shape
+        [output_shape[0], output_shape[1], channels] (where channels = input
+        channels)
+    :param is_flip: flag for randomly flipping image horizontally
+    :type is_flip: bool (default: True)
+    :param is_rotated: flag for randomly rotating image by random angle in range
+        [-15, 15] deg
+    :type is_rotated: bool (default: True)
+    :param norm: norm images to [0, 1] range.
+    :type norm: boolean (default: True)
+    :return: batch of images, albedo labels and shading labels
+    ATTENTION: image rotation (function sp.ndimage.interpolation.rotate() and
+        underlying function sp.ndimage._nd_image.geometric_transform() take
+        by far most of the time)
+    """
+    img_batch = []
+    alb_batch = []
+    shad_batch = []
+    for row in deq.values:
+        # read images (image + labels):
+        imgs = [sp.misc.imread(name=path, flatten=False,
+                               mode='RGB') for path in row]
+
+        # stack images and labels along depth (channels) to perform the same
+        # operations on them:
+        imgs_stacked = np.dstack(imgs)
+        # preprocess images (randomly flip horizontally, rotate and/or crop):
+        imgs_stacked = process_image(image=imgs_stacked, is_flip=is_flip,
+                                     is_rotated=is_rotated, output_shape=shape,
+                                     norm=norm)
+        # split images to get [image, albedo, shading]:
+        split_points = np.array([img.shape[2] for img in imgs]).cumsum()[:-1]
+        imgs_splitted = np.split(ary=imgs_stacked,
+                                 indices_or_sections=split_points,
+                                 axis=2)
+        img_batch.append(imgs_splitted[0])
+        alb_batch.append(imgs_splitted[1])
+        shad_batch.append(imgs_splitted[2])
+    return np.stack(img_batch), np.stack(alb_batch), np.stack(shad_batch)
 
