@@ -40,4 +40,6 @@ def time_tuple_to_str(time_tuple):
             s = s[3:] + ' min'
         else:
             s = s[6:] + ' sec'
+            s = s.lstrip('0')
     return s
+
