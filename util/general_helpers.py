@@ -15,7 +15,7 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"                       
                                                  
                                                  
-__all__ = ['get_time_format']   
+__all__ = ['get_time_format', 'time_tuple_to_str']   
 
 
 def get_time_format(time_in_sec):
@@ -30,3 +30,14 @@ def get_time_format(time_in_sec):
     secs = int(time_in_sec % 3600 % 60)
     return hours, mins, secs
 
+def time_tuple_to_str(time_tuple):
+    s = '{h:02}:{m:02}:{s:02}'.format(h=time_tuple[0], m=time_tuple[1],
+                                      s=time_tuple[2])
+    if time_tuple[0]!=0:
+        s += ' h'
+    else:
+        if time_tuple[1]!=0:
+            s = s[3:] + ' min'
+        else:
+            s = s[6:] + ' sec'
+    return s

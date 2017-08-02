@@ -34,8 +34,6 @@ import time
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-get_ipython().magic('matplotlib inline')
-import matplotlib.pyplot as plt
 
 import input_queues as iq
 import cnn_model
@@ -48,8 +46,8 @@ print('Tensorflow version: \n' + tf.__version__)
 
 # data path constants:
 # DATA_DIR = '../data/mnist/'
-DATA_DIR = 'data/'
-# DATA_DIR = '/usr/udo/data/'
+# DATA_DIR = 'data/'
+DATA_DIR = '/usr/udo/data/'
 PREDICT_PATH = ''
 path_inference_graph = ['logs/inference_graphs/narihira2015/' +
                         'tfmodel_inference.meta']
@@ -85,7 +83,7 @@ DISPLAY_STEP = 2  # every DIPLAY_STEP'th training iteration information is
     # printed (default: 100)
 SUMMARY_STEP = 2  # every SUMMARY_STEP'th training iteration a summary file is 
     # written to LOGS_PATH
-DEVICE = '/cpu:0'  # device on which the variable is saved/processed
+DEVICE = '/gpu:0'  # device on which the variable is saved/processed
 
 
 # In[2]:
@@ -213,7 +211,7 @@ with tf.name_scope('loss/'):
 # plt_help.show_graph(graph.as_graph_def())
 
 
-# In[11]:
+# In[ ]:
 
 
 # import data:
@@ -319,7 +317,7 @@ with tf.Session() as sess:
                          y_albedo_label: alb_batch,
                          y_shading_label: shad_batch,
                          training: True}
-            sess.run(opt_step, feed_dict=feed_dict)
+#             sess.run(opt_step, feed_dict=feed_dict)
 
             # report training set accuracy every DISPLAY_STEP-th step:
             if (data_train.num_iter) % DISPLAY_STEP == 0:
@@ -332,11 +330,10 @@ with tf.Session() as sess:
                                       feed_dict=feed_dict)
                 duration_time = time.time() - start_time
                 duration_time = ghelp.get_time_format(time_in_sec=duration_time)
+                duration_time = ghelp.time_tuple_to_str(time_tuple=duration_time)
                 print('iteration {}: training '.format(data_train.num_iter) + 
                       'loss {tr_loss:.2f} (ET: '.format(tr_loss=train_loss) +
-                      '{dur_time_h:02}:'.format(dur_time_h=duration_time[0]) +
-                      '{dur_time_m:02}:'.format(dur_time_m=duration_time[1]) +
-                      '{dur_time_s:02} h).'.format(dur_time_s=duration_time[2]))
+                      '{}).'.format(duration_time))
                 # reset timer to measure the displayed training steps:
                 start_time = time.time()
 
@@ -391,9 +388,15 @@ with tf.Session() as sess:
                                                  feed_dict=feed_dict)
                 summary_writer.add_summary(summary=validation_loss_total, 
                                            global_step=data_train.num_iter)
+                duration_time = time.time() - start_time
+                duration_time = ghelp.get_time_format(time_in_sec=duration_time)
+                duration_time = ghelp.time_tuple_to_str(time_tuple=duration_time)
                 print('    Num validation data: ' +
-                      '{} mean loss: , '.format(data_valid.df.shape[0]) +
-                      '{ml:.2f}'.format(ml=validation_loss / valid_steps_per_epoch))
+                      '{}, mean loss: '.format(data_valid.df.shape[0]) +
+                      '{ml:.2f}'.format(ml=validation_loss / valid_steps_per_epoch) +
+                      ' (ET: {}).'.format(duration_time))
+                # reset timer to measure the displayed training steps:
+                start_time = time.time()
 
             if data_train.num_iter % SUMMARY_STEP == 0:
                 feed_dict = {x: img_batch,  
@@ -411,10 +414,9 @@ with tf.Session() as sess:
         except IndexError:
             end_total_time = time.time() - start_total_time
             end_total_time = ghelp.get_time_format(end_total_time)
+            end_total_time = ghelp.time_tuple_to_str(time_tuple=end_total_time)
             print('\nTraining done... total training time: ' + 
-                  '{h:02}:'.format(h=end_total_time[0]) +
-                  '{m:02}:{s:02} h.'.format(m=end_total_time[1], 
-                                            s=end_total_time[2]))
+                  '{}.'.format(end_total_time))
             break
 
 
@@ -427,7 +429,7 @@ with tf.Session() as sess:
 # tf.global_variables()
 
 
-# In[14]:
+# In[13]:
 
 
 # !tensorboard --logdir ./logs/1
