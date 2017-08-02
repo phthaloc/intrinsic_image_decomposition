@@ -8,26 +8,31 @@
 #     - loss function
 #     - optimization op
 #     
-# To build the graph it is necessary to know the node names of all relevant layers, placeholders etc. for restoring the model later.
+# To build the graph it is necessary to know the node names of all relevant 
+# layers, placeholders etc. for restoring the model later.
 # 
 # pay ATTENTION to:
-#     - the imported model must be in the same graph as the nodes which are added later
-#         -> load the model first to the default graph, then add further ops
+#     the imported model must be in the same graph as the nodes which are 
+#     added later
+#     -> load the model first to the default graph, then add further ops
 #     
 # also test to input input-images of different sizes (multiples of 32px). 
 # It might not work because input placeholder is defined fix.
 # perhaps input node should not be saved inside the model?!
 # 
-# output of model has name (deconv_s2out_shading/BiasAdd:0 and deconv_s2out_albedo/BiasAdd:0). 
-# these are to complicated?!
+# output of model has name (deconv_s2out_shading/BiasAdd:0 and 
+# deconv_s2out_albedo/BiasAdd:0). 
+# simpler names?!
 # 
 # 
-# To plot all graphs directly in this notebook, run jupyter form terminal like this:
+# To plot all graphs directly in this notebook, run jupyter form terminal like 
+# this:
 #     jupyter notebook --NotebookApp.iopub_data_rate_limit=10000000000
 
 # In[1]:
 
 
+import os   
 import sys
 sys.path.append('./util')
 import time
@@ -43,6 +48,12 @@ import cnn_helpers as cnnhelp
 
 print('Python version: \n' + sys.version)
 print('Tensorflow version: \n' + tf.__version__)
+
+# make only 'gpu:0' visible, so that only one gpu is used not both, see also
+# https://github.com/tensorflow/tensorflow/issues/5066
+# https://github.com/tensorflow/tensorflow/issues/3644#issuecomment-237631171
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 # data path constants:
 # DATA_DIR = '../data/mnist/'
@@ -204,7 +215,7 @@ with tf.name_scope('loss/'):
                                            tensor=valid_loss)
 
 
-# In[10]:
+# In[ ]:
 
 
 # # plot complete graph:
@@ -260,8 +271,10 @@ init_local = tf.local_variables_initializer()
 # config = tf.ConfigProto(allow_soft_placement = True,
 #                         intra_op_parallelism_threads=3,
 #                         log_device_placement=False)
-# with tf.Session(config=config) as sess: 
-with tf.Session() as sess:
+config = tf.ConfigProto(device_count = {'GPU': 1},
+                        intra_op_parallelism_threads=3)
+with tf.Session(config=config) as sess: 
+# with tf.Session() as sess:
     ############################################################################
     # initialize all variables:
     sess.run([init_global, init_local])
@@ -282,7 +295,6 @@ with tf.Session() as sess:
     
     ############################################################################
     # Training:
-    epoch_temp = 0
     # train loop
     #     train for until all data is used
     #     number of iterations depends on number of data, number of epochs and 
@@ -317,7 +329,7 @@ with tf.Session() as sess:
                          y_albedo_label: alb_batch,
                          y_shading_label: shad_batch,
                          training: True}
-#             sess.run(opt_step, feed_dict=feed_dict)
+            sess.run(opt_step, feed_dict=feed_dict)
 
             # report training set accuracy every DISPLAY_STEP-th step:
             if (data_train.num_iter) % DISPLAY_STEP == 0:
@@ -420,7 +432,7 @@ with tf.Session() as sess:
             break
 
 
-# In[12]:
+# In[ ]:
 
 
 # print all op and tensor names in default graph:
@@ -429,7 +441,7 @@ with tf.Session() as sess:
 # tf.global_variables()
 
 
-# In[13]:
+# In[ ]:
 
 
 # !tensorboard --logdir ./logs/1
