@@ -57,13 +57,13 @@ LOGS_PATH = 'logs/1/'  # path to summary files
 # create logger (write to file and stdout):
 logger = ghelp.create_logger(filename=LOGS_PATH + 'training.log')
 
-logger.debug('Python version: \n' + sys.version + 
-             '\n    Tensorflow version: \n' + tf.__version__)
+logger.debug('Python version: \n    ' + sys.version + 
+             '\n    Tensorflow version: ' + tf.__version__)
 
 # data path constants:
 # DATA_DIR = '../data/mnist/'
-DATA_DIR = 'data/'
-# DATA_DIR = '/usr/udo/data/'
+# DATA_DIR = 'data/'
+DATA_DIR = '/usr/udo/data/'
 PREDICT_PATH = ''
 path_inference_graph = ['logs/inference_graphs/narihira2015/' +
                         'tfmodel_inference.meta']
@@ -86,7 +86,7 @@ IMAGE_SHAPE = [32 * m_height, 32 * m_width, 3]  # complete image size
     # [436, 1024, 3] # Narihira2015 use [M*32=13*32=416, 416, 3]
 logger.info('Trained on images of shape: {}'.format(IMAGE_SHAPE))
 
-INITIAL_LEARNING_RATE = 1e-5
+INITIAL_LEARNING_RATE = 1e-3
 logger.info('Initial learning rate: {}'.format(INITIAL_LEARNING_RATE))
 
 # probability that a neuron's output is kept during dropout (only during 
@@ -106,7 +106,7 @@ DISPLAY_STEP = 2  # every DIPLAY_STEP'th training iteration information is
     # printed (default: 100)
 SUMMARY_STEP = 2  # every SUMMARY_STEP'th training iteration a summary file is 
     # written to LOGS_PATH
-DEVICE = '/gpu:0'  # device on which the variable is saved/processed
+DEVICE = '/cpu:0'  # device on which the variable is saved/processed
 
 
 # In[2]:
