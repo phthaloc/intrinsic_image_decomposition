@@ -36,18 +36,16 @@ import os
 import sys
 sys.path.append('./util')
 import time
+import datetime
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-
 import input_queues as iq
 import cnn_model
 import plot_helpers as plt_help
 import general_helpers as ghelp
+import nn_helpers as nnhelp
 import cnn_helpers as cnnhelp
-
-print('Python version: \n' + sys.version)
-print('Tensorflow version: \n' + tf.__version__)
 
 # make only 'gpu:0' visible, so that only one gpu is used not both, see also
 # https://github.com/tensorflow/tensorflow/issues/5066
@@ -55,20 +53,29 @@ print('Tensorflow version: \n' + tf.__version__)
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
+LOGS_PATH = 'logs/1/'  # path to summary files
+# create logger (write to file and stdout):
+logger = ghelp.create_logger(filename=LOGS_PATH + 'training.log')
+
+logger.debug('Python version: \n' + sys.version + 
+             '\n    Tensorflow version: \n' + tf.__version__)
+
 # data path constants:
 # DATA_DIR = '../data/mnist/'
-# DATA_DIR = 'data/'
-DATA_DIR = '/usr/udo/data/'
+DATA_DIR = 'data/'
+# DATA_DIR = '/usr/udo/data/'
 PREDICT_PATH = ''
 path_inference_graph = ['logs/inference_graphs/narihira2015/' +
                         'tfmodel_inference.meta']
 # path_inference_graph = ['/Users/udodehm/Downloads/camp_depth_irolaina/' + '
 #                         'ResNet_pretrained/ResNet-L50.meta']
 # path_inference_graph = ['vgg16/vgg16.tfmodel']
-
 path_inference_graph = path_inference_graph[0]
+logger.info('Path to infrence graph:\n    {}'.format(path_inference_graph))
+
 path_restore_model = None #'logs/2/tfmodel-5'
-LOGS_PATH = 'logs/1/'  # path to summary files
+logger.info('Path to restored (already done some training) model\n' +
+            '    (if available): {}'.format(path_restore_model))
 
 # hyper-parameters:
 m_height = 13  # multiplicate of image height size -> network is designed so 
@@ -77,14 +84,19 @@ m_width = m_height  # multiplicate of image width size -> network
     # is designed so that it can take images with shape of multiples of m
 IMAGE_SHAPE = [32 * m_height, 32 * m_width, 3]  # complete image size 
     # [436, 1024, 3] # Narihira2015 use [M*32=13*32=416, 416, 3]
+logger.info('Trained on images of shape: {}'.format(IMAGE_SHAPE))
+
 INITIAL_LEARNING_RATE = 1e-5
+logger.info('Initial learning rate: {}'.format(INITIAL_LEARNING_RATE))
+
 # probability that a neuron's output is kept during dropout (only during 
 # training!!!, testing/validation -> 1.0):
 # DROPOUT_RATE = 0.5
 BATCH_SIZE = 8  # nr of data which is put through the network before updating 
     # it, as default use: 32. 
-# BATCH_SIZE determines how many data samples are loaded in the memory (be 
-# careful with memory space)
+    # BATCH_SIZE determines how many data samples are loaded in the memory (be 
+    # careful with memory space)
+    
 NUM_EPOCHS = 2  # nr of times the training process loops through the 
     # complete training data set (how often is the tr set 'seen')
     # if you have 1000 training examples, and your batch size is 500, then it
@@ -128,6 +140,7 @@ DEVICE = '/gpu:0'  # device on which the variable is saved/processed
 # http://cv-tricks.com/tensorflow-tutorial/save-restore-tensorflow-models-quick-complete-tutorial/
 saver_restore = tf.train.import_meta_graph(path_inference_graph, 
                                            clear_devices=True)
+logger.debug('Restored inference graph.')
 
 
 # In[4]:
@@ -180,10 +193,12 @@ loss = cnnhelp.loss_fct(label_albedo=y_albedo_label,
                         prediction_albedo=y_albedo_pred, 
                         prediction_shading=y_shading_pred, 
                         lambda_=0.5)
+logger.debug('Defined loss.')
 
 # Use an AdamOptimizer to train the network:
 with tf.name_scope('optimization'):
     opt_step = tf.train.AdamOptimizer(INITIAL_LEARNING_RATE).minimize(loss)
+logger.debug('Defined optimization method.')
 
 
 # In[8]:
@@ -213,16 +228,19 @@ with tf.name_scope('loss/'):
     valid_loss = tf.placeholder(dtype=tf.float32)
     valid_loss_summary = tf.summary.scalar(name='validation_loss', 
                                            tensor=valid_loss)
+logger.debug('Defined validation loss')
 
 
-# In[ ]:
+# In[10]:
 
 
 # # plot complete graph:
 # plt_help.show_graph(graph.as_graph_def())
+logger.debug('Finished building training graph.')
+logger.info('Total parameters of network: {}'.format(nnhelp.network_params()))
 
 
-# In[ ]:
+# In[12]:
 
 
 # import data:
@@ -235,6 +253,7 @@ df_train = DATA_DIR + df_train
 # instantiate a data queue for feeding data in (mini) batches to cnn:
 data_train = iq.DataQueue(df=df_train, batch_size=BATCH_SIZE,
                           num_epochs=NUM_EPOCHS)
+logger.debug('Imported training data from\n    {}'.format(DATA_DIR + file))
 
 # import validation data set: 
 # why not using the whole validation set for validation at once? 
@@ -249,6 +268,7 @@ df_valid = DATA_DIR + df_valid
 # instantiate a data queue for feeding data in (mini) batches to cnn:
 data_valid = iq.DataQueue(df=df_valid, batch_size=BATCH_SIZE,
                           num_epochs=NUM_EPOCHS)
+logger.debug('Imported validation data from\n    {}'.format(DATA_DIR + file))
 
 # testing data set: 
 file = 'sample_data_sintel_shading_test.csv'
@@ -259,9 +279,10 @@ df_test = DATA_DIR + df_test
 # instantiate a data queue for feeding data in (mini) batches to cnn:
 data_test = iq.DataQueue(df=df_test, batch_size=BATCH_SIZE,
                          num_epochs=1)
+logger.debug('Imported testing data from\n    {}'.format(DATA_DIR + file))
 
 ################################################################################
-
+logger.info('Start training:')
 # Initialization:
 # Op that initializes global variables in the graph:
 init_global = tf.global_variables_initializer()
@@ -300,14 +321,15 @@ with tf.Session(config=config) as sess:
     #     number of iterations depends on number of data, number of epochs and 
     #     batch size:
     iter_start = data_train.iter_left
-    print('INFO: For training it takes {} '.format(iter_start) +
-          '(= # data / batch_size * epochs) iterations to loop through ' +
-          '{} samples of training data over '.format(data_train.df.shape[0]) +
-          '{} epochs summarized in batches '.format(data_train.num_epochs) +
-          'of size {}.\n'.format(data_train.batch_size) +
-          'So, there are # data / batch_size = ' +
-          '{} '.format(int(data_train.df.shape[0] / data_train.batch_size)) + 
-          'iterations per epoch.\n')
+    logger.info('For training it takes {}\n'.format(iter_start) +
+                '    (= # data / batch_size * epochs) iterations to loop ' +
+                'through {} samples of\n    '.format(data_train.df.shape[0]) +
+                'training data over {} '.format(data_train.num_epochs) +
+                'epochs summarized in batches of size ' + 
+                '{}.\n'.format(data_train.batch_size) +
+                '    So, there are # data / batch_size = ' +
+                '{} '.format(int(data_train.df.shape[0]/data_train.batch_size))+
+                'iterations per epoch.')
     
     while data_train.iter_left >= 0:
         try:
@@ -343,9 +365,10 @@ with tf.Session(config=config) as sess:
                 duration_time = time.time() - start_time
                 duration_time = ghelp.get_time_format(time_in_sec=duration_time)
                 duration_time = ghelp.time_tuple_to_str(time_tuple=duration_time)
-                print('iteration {}: training '.format(data_train.num_iter) + 
-                      'loss {tr_loss:.2f} (ET: '.format(tr_loss=train_loss) +
-                      '{}).'.format(duration_time))
+                logger.info('iteration {}: '.format(data_train.num_iter) +
+                            'training loss ' + 
+                            '{tr_loss:.2f} (ET: '.format(tr_loss=train_loss) +
+                            '{}).'.format(duration_time))
                 # reset timer to measure the displayed training steps:
                 start_time = time.time()
 
@@ -359,10 +382,7 @@ with tf.Session(config=config) as sess:
                 # save checkpoint files to disk:
                 save_path = saver.save(sess, LOGS_PATH + 'tfmodel',
                                        global_step=data_train.num_iter)
-                print('Validation scores after epoch ' + 
-                      '{} '.format(data_train.completed_epochs + 1) + 
-                      '(step {}):\n'.format(data_train.num_iter) +
-                      '    Model saved in file: {}.'.format(save_path))
+
                 # After each training epoch we will use the complete validation 
                 # data set to calculate the error/accuracy on the validation 
                 # set:
@@ -403,10 +423,14 @@ with tf.Session(config=config) as sess:
                 duration_time = time.time() - start_time
                 duration_time = ghelp.get_time_format(time_in_sec=duration_time)
                 duration_time = ghelp.time_tuple_to_str(time_tuple=duration_time)
-                print('    Num validation data: ' +
-                      '{}, mean loss: '.format(data_valid.df.shape[0]) +
-                      '{ml:.2f}'.format(ml=validation_loss / valid_steps_per_epoch) +
-                      ' (ET: {}).'.format(duration_time))
+                logger.info('Validation scores after epoch ' + 
+                            '{} '.format(data_train.completed_epochs + 1) + 
+                            '(step {}):\n'.format(data_train.num_iter) +
+                            '    Model saved in file: {}.\n'.format(save_path) +
+                            '    # validation data: ' +
+                            '{}, mean loss: '.format(data_valid.df.shape[0]) +
+                            '{ml:.2f}'.format(ml=validation_loss / valid_steps_per_epoch) +
+                            ' (ET: {}).'.format(duration_time))
                 # reset timer to measure the displayed training steps:
                 start_time = time.time()
 
@@ -427,21 +451,13 @@ with tf.Session(config=config) as sess:
             end_total_time = time.time() - start_total_time
             end_total_time = ghelp.get_time_format(end_total_time)
             end_total_time = ghelp.time_tuple_to_str(time_tuple=end_total_time)
-            print('\nTraining done... total training time: ' + 
-                  '{}.'.format(end_total_time))
+            logger.info('Training done... total training time: ' + 
+                        '{}.'.format(end_total_time))
             break
+logger.info('Finished training.')
 
 
-# In[ ]:
-
-
-# print all op and tensor names in default graph:
-# len([print(n.name) for n in graph.as_graph_def().node])
-# list all global variables:
-# tf.global_variables()
-
-
-# In[ ]:
+# In[14]:
 
 
 # !tensorboard --logdir ./logs/1
