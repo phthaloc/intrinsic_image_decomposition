@@ -4,6 +4,7 @@
 General smaller, usefull helper functions.
 """                                              
 
+import os
 import logging
 
 __author__ = "Udo Dehm"                          
@@ -52,6 +53,9 @@ def create_logger(filename):
     :type filename: str
     :returns: logger object
     """
+    # create directory if it does not exist
+    if not os.path.exists('/'.join(filename.split('/')[:-1])):
+        os.makedirs('/'.join(filename.split('/')[:-1]))
     # create logger
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG)
