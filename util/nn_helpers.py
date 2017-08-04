@@ -5,6 +5,7 @@ Module that contains classes for creating file structures suitable for
 deep learning neural network feeding.
 """
 
+import numpy as np
 import tensorflow as tf
 
 __author__ = "Udo Dehm"
@@ -17,7 +18,7 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development" 
  
 
-__all__ = ['_activation_summary', '_variable_on_device']
+__all__ = ['_activation_summary', '_variable_on_device', 'network_params']
 
 
 def _activation_summary(x):
@@ -85,3 +86,18 @@ def _variable_on_device(name,
         return tf.get_variable(name, shape, initializer=initializer,
                                trainable=trainable)
 
+def network_params():
+    """
+    Calculates the total number of a neural network.
+    Make sure to call it after the complete training graph is built.
+    :returns: Total number of network parameters
+    """
+    # calculate total number of network parameters:
+    total_parameters = 0
+    # get trainable parameters (biases, weights of cnn filters etc.):
+    for variable in tf.trainable_variables():
+        # shape is an array of tf.Dimension
+        shape = variable.get_shape()
+        variable_parametes = int(np.prod(np.array(shape)))
+        total_parameters += variable_parametes
+    return total_parameters
