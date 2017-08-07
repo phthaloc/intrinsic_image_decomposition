@@ -86,6 +86,7 @@ def _variable_on_device(name,
         return tf.get_variable(name, shape, initializer=initializer,
                                trainable=trainable)
 
+
 def network_params():
     """
     Calculates the total number of a neural network.
@@ -101,3 +102,4 @@ def network_params():
         variable_parametes = int(np.prod(np.array(shape)))
         total_parameters += variable_parametes
     return total_parameters
+
