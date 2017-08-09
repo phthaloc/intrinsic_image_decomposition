@@ -56,7 +56,11 @@ def _strip_consts(graph_def, max_const_size=32):
             tensor = n.attr['value'].tensor
             size = len(tensor.tensor_content)
             if size > max_const_size:
-                tensor.tensor_content = "<stripped %d bytes>"%size
+                try:
+                    tensor.tensor_content = "<stripped %d bytes>"%size
+                except TypeError:
+                    tensor.tensor_content = bytes("<stripped %d bytes>"%size,
+                                                  'utf-8')
     return strip_def
 
 
