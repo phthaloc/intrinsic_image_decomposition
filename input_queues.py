@@ -549,29 +549,29 @@ def process_image(image, is_flip=True, is_rotated=True, output_shape=None,
         # horizontally:
         is_flip = np.random.choice([False, True], p=[0.5, 0.5])
         # flip image:
-        img = image[:, ::-1]
+        image = image[:, ::-1]
 
     # rotate image by angle degrees:
     if is_rotated:
         # angle in degrees:
         angle = np.random.normal(loc=0, scale=15 / 2)
-        img = sp.ndimage.interpolation.rotate(input=img, angle=angle,
-                                              axes=(1, 0), reshape=False,
-                                              output=None, order=3,
-                                              mode='constant', cval=0.0,
-                                              prefilter=True)
+        image = sp.ndimage.interpolation.rotate(input=image, angle=angle,
+                                                axes=(1, 0), reshape=False,
+                                                output=None, order=3,
+                                                mode='constant', cval=0.0,
+                                                prefilter=True)
 
     # randomly crop image to output shape:
     if output_shape:
-        y_start = np.random.randint(img.shape[0] - output_shape[0])
-        x_start = np.random.randint(img.shape[1] - output_shape[1])
-        img = img[y_start:y_start + output_shape[0],
-              x_start:x_start + output_shape[1], :]
+        y_start = np.random.randint(image.shape[0] - output_shape[0])
+        x_start = np.random.randint(image.shape[1] - output_shape[1])
+        image = image[y_start:y_start + output_shape[0],
+                      x_start:x_start + output_shape[1], :]
 
     if norm:
-        img = img / 255
+        image = image / 255
 
-    return img
+    return image
 
 
 def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
