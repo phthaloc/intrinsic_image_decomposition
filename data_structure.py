@@ -271,10 +271,22 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                 [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_shading + 'shading/**/*.png')],
                 columns=['shading_label_path'])
             df_shading[['scene', 'frame']] = df_shading['shading_label_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
-            df_invalid = pd.DataFrame(
-                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
-                columns=['invalid_path'])
-            df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+            try:
+                df_invalid = pd.DataFrame(
+                    [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
+                    columns=['invalid_path'])
+                df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+            except KeyError:
+                print('We need to download and extract the ' +
+                      'mpi_sintel_complete dataset first to get the invalid ' +
+                      'pixel mask.')
+                main(data_set='mpi_sintel_complete',
+                     data_dir=data_dir, 
+                     create_csv_lists=False)
+                df_invalid = pd.DataFrame(
+                    [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
+                    columns=['invalid_path'])
+                df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
 
             # get list which contains scenes which have to be deleted:
             lst_del = [list(df_albedo[~df_albedo['scene'].isin(df_clean['scene'].unique())]['scene'].unique()) +
@@ -404,11 +416,11 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
 if __name__ == '__main__':
     # directory where to save csv files:
-    data_dir = 'data1/'
+    data_dir = '/usr/udo/data1/'
 
-    main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
+    #main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
     main(data_set='mpi_sintel_shading', data_dir=data_dir,
          create_csv_lists=True)
     main(data_set='mpi_sintel_complete', data_dir=data_dir,
          create_csv_lists=True)
-    main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
+    #main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
