@@ -106,11 +106,14 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
     url_sintel_shading = 'http://files.is.tue.mpg.de/jwulff/sintel/extras/MPI-Sintel-training_shading.zip'
 
     url_mit = 'http://people.csail.mit.edu/rgrosse/intrinsic/intrinsic-data.tar.gz'
+        
+    # directory of data
+    data_dir_sintel_complete = data_dir + 'mpi-sintel-complete/'
+    data_dir_sintel_shading = data_dir + 'mpi-sintel-shading/'
+    data_dir_mit = data_dir + 'MIT-intrinsic/data/'
+    data_dir_iiw = data_dir + 'iiw-dataset/data/'
 
     if data_set == 'iiw':
-        # directory of data
-        data_dir_iiw = data_dir + 'iiw-dataset/data/'
-
         download.maybe_download_and_extract(url=url_iiw, download_dir=data_dir)
 
         if create_csv_lists:
@@ -163,77 +166,80 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                                       index=False, header=False)
 
     elif data_set == 'mpi_sintel_complete':
-        data_dir_sintel = data_dir + 'mpi-sintel-complete/'
-
+        data_dir_sintel_complete = data_dir + 'mpi-sintel-complete/'
         download.maybe_download_and_extract(url=url_sintel_complete,
-                                            download_dir=data_dir_sintel)
-
+                                            download_dir=data_dir_sintel_complete)
         if create_csv_lists:
             # use 'clean pass' images (see narihira2015: p.3: "'final images'
             # [...] are the result of additional computer graphics tricks which
             # dristract from our application."):
             df_sintel = pd.DataFrame([[os.path.relpath(x, data_dir),
-                                       os.path.relpath(x, data_dir).replace('clean', 'albedo')
-                                       ] for x in glob.glob(data_dir_sintel + 'training/clean/**/*.png')],
-                                     columns=['image_path', 'label_path'])
+                                       os.path.relpath(x, data_dir).replace('clean', 'albedo'),
+                                       os.path.relpath(x, data_dir).replace('clean', 'invalid')
+                                       ] for x in glob.glob(data_dir_sintel_complete + 'training/clean/**/*.png')],
+                                     columns=['image_path', 'label_path', 'invalid_path'])
 
             # get training validation and testing data set of the mpi-sintel
-            # data:
+            #  data:
             df_sintel_train, df_sintel_valid, df_sintel_test, \
-                df_sintel_train_sample, df_sintel_valid_sample, \
-                df_sintel_test_sample = create_datasets(df=df_sintel,
-                                                        p_train=0.8,
-                                                        p_valid=0.1,
-                                                        p_test=0.1,
-                                                        sample=True)
+            df_sintel_train_sample, df_sintel_valid_sample, \
+            df_sintel_test_sample = create_datasets(df=df_sintel,
+                                                    p_train=0.8,
+                                                    p_valid=0.1,
+                                                    p_test=0.1,
+                                                    sample=True)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
+
             df_sintel.to_csv(path_or_buf=data_dir + 'data_sintel_complete_complete.csv',
-                             sep=',',
-                             columns=['image_path', 'label_path'],
-                             index=False,
-                             header=False)
+                 sep=',',
+                 columns=['image_path', 'label_path', 'invalid_path'],
+                 index=False,
+                 header=False)
             df_sintel_train.to_csv(path_or_buf=data_dir + 'data_sintel_complete_train.csv',
                                    sep=',',
-                                   columns=['image_path', 'label_path'],
+                                   columns=['image_path', 'label_path', 'invalid_path'],
                                    index=False,
                                    header=False)
             df_sintel_valid.to_csv(path_or_buf=data_dir + 'data_sintel_complete_valid.csv',
                                    sep=',',
-                                   columns=['image_path', 'label_path'],
+                                   columns=['image_path', 'label_path', 'invalid_path'],
                                    index=False,
                                    header=False)
             df_sintel_test.to_csv(path_or_buf=data_dir + 'data_sintel_complete_test.csv',
                                   sep=',',
-                                  columns=['image_path', 'label_path'],
+                                  columns=['image_path', 'label_path', 'invalid_path'],
                                   index=False,
                                   header=False)
-
             df_sintel_train_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_train.csv',
                                           sep=',',
-                                          columns=['image_path', 'label_path'],
+                                          columns=['image_path', 'label_path', 'invalid_path'],
                                           index=False,
                                           header=False)
             df_sintel_valid_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_valid.csv',
                                           sep=',',
-                                          columns=['image_path', 'label_path'],
+                                          columns=['image_path', 'label_path', 'invalid_path'],
                                           index=False,
                                           header=False)
             df_sintel_test_sample.to_csv(path_or_buf=data_dir + 'sample_data_sintel_complete_test.csv',
                                          sep=',',
-                                         columns=['image_path', 'label_path'],
-                                         index=False, header=False)
+                                         columns=['image_path', 'label_path', 'invalid_path'],
+                                         index=False,
+                                         header=False)
 
             # also save (unknown) test files:
             df_sintel_test_unknown = pd.DataFrame([[os.path.relpath(x, data_dir),
+                                                    None,
                                                     None
-                                                    ] for x in glob.glob(data_dir_sintel + 'test/clean/**/*.png')],
-                                                  columns=['image_path', 'label_path'])
+                                                    ] for x in glob.glob(data_dir_sintel_complete + 'test/clean/**/*.png')],
+                                                  columns=['image_path', 'label_path', 'invalid_path'])
+
             df_sintel_test_unknown.to_csv(path_or_buf=data_dir + 'data_sintel_complete_test_unknown.csv', sep=',',
-                                          columns=['image_path', 'label_path'], index=False, header=False)
+                                          columns=['image_path', 'label_path', 'invalid_path'], index=False, header=False)
 
     elif data_set == 'mpi_sintel_shading':
+
         # The problem is that the shading files (\*\*/out\_&ast;.png)
         # are named differently than the clean/albodo files
         # (\*\*/frame\_\*.png).
@@ -242,7 +248,6 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
         # separately, sort it by the scene and frame (increasing) and
         # merge the three paths. Furthermore we have to get rid of some
         # scenes which are not included in either clean or albedo or shading.
-        data_dir_sintel = data_dir + 'mpi-sintel-shading/'
 
         # maybe download data if necessary:
         download.maybe_download_and_extract(url=url_sintel_images,
@@ -255,26 +260,28 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
         if create_csv_lists:
             # import images and labels separateley:
             df_clean = pd.DataFrame(
-                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel + 'clean_noshadingtextures/**/*.png')],
+                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_shading + 'clean_noshadingtextures/**/*.png')],
                 columns=['image_path'])
-            df_clean[['scene', 'frame']] = df_clean['image_path'].apply(lambda row: row.split('/')[-2:]).apply(
-                pd.Series)
-
+            df_clean[['scene', 'frame']] = df_clean['image_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
             df_albedo = pd.DataFrame([os.path.relpath(x, data_dir) for x in
-                                      glob.glob(data_dir_sintel + 'albedo_noshadingtextures/**/*.png')],
+                                      glob.glob(data_dir_sintel_shading + 'albedo_noshadingtextures/**/*.png')],
                                      columns=['albedo_label_path'])
-            df_albedo[['scene', 'frame']] = df_albedo['albedo_label_path'].apply(lambda row: row.split('/')[-2:]).apply(
-                pd.Series)
-
+            df_albedo[['scene', 'frame']] = df_albedo['albedo_label_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
             df_shading = pd.DataFrame(
-                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel + 'shading/**/*.png')],
+                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_shading + 'shading/**/*.png')],
                 columns=['shading_label_path'])
             df_shading[['scene', 'frame']] = df_shading['shading_label_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+            df_invalid = pd.DataFrame(
+                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
+                columns=['invalid_path'])
+            df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
 
             # get list which contains scenes which have to be deleted:
             lst_del = [list(df_albedo[~df_albedo['scene'].isin(df_clean['scene'].unique())]['scene'].unique()) +
                        list(df_clean[~df_clean['scene'].isin(df_shading['scene'].unique())]['scene'].unique()) +
-                       list(df_shading[~df_shading['scene'].isin(df_albedo['scene'].unique())]['scene'].unique())][0]
+                       list(df_shading[~df_shading['scene'].isin(df_invalid['scene'].unique())]['scene'].unique()) +
+                       list(df_invalid[~df_invalid['scene'].isin(df_albedo['scene'].unique())]['scene'].unique())
+                       ][0]
 
             # delete scenes from lst_del, sort by ('scene', 'frame') and reset
             # index:
@@ -287,66 +294,68 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
             df_shading = df_shading[~df_shading['scene'].isin(lst_del)]
             df_shading = df_shading.sort_values(['scene', 'frame'])
             df_shading.reset_index(drop=True, inplace=True)
+            df_invalid = df_invalid[~df_invalid['scene'].isin(lst_del)]
+            df_invalid = df_invalid.sort_values(['scene', 'frame'])
+            df_invalid.reset_index(drop=True, inplace=True)
 
-            # merge all three DataFrames and keep just important paths:
+            # merge all four DataFrames and keep just important paths:
             df_merged = df_clean.merge(df_albedo, left_index=True,
                                        right_index=True, how='inner')
-            df_sintel2 = df_merged.merge(df_shading, left_index=True,
+            df_merged = df_merged.merge(df_shading, left_index=True,
+                                        right_index=True, how='inner')
+            df_sintel2 = df_merged.merge(df_invalid, left_index=True,
                                          right_index=True, how='inner')[
-                ['image_path', 'albedo_label_path', 'shading_label_path']]
+                ['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path']]
 
             # get training validation and testing data set of the mpi-sintel
             # data:
             df_sintel_train2, df_sintel_valid2, df_sintel_test2, \
-                df_sintel_train_sample2, df_sintel_valid_sample2, \
-                df_sintel_test_sample2 = create_datasets(df=df_sintel2,
-                                                         p_train=0.8,
-                                                         p_valid=0.1,
-                                                         p_test=0.1,
-                                                         sample=True)
+            df_sintel_train_sample2, df_sintel_valid_sample2, \
+            df_sintel_test_sample2 = create_datasets(df=df_sintel2,
+                                                     p_train=0.8,
+                                                     p_valid=0.1,
+                                                     p_test=0.1,
+                                                     sample=True)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
             df_sintel2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_complete.csv',
                               sep=',',
-                              columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                              columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                               index=False,
                               header=False)
             df_sintel_train2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_train.csv',
                                     sep=',',
-                                    columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                    columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                                     index=False,
                                     header=False)
             df_sintel_valid2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_valid.csv',
                                     sep=',',
-                                    columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                    columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                                     index=False,
                                     header=False)
             df_sintel_test2.to_csv(path_or_buf=data_dir + 'data_sintel_shading_test.csv',
                                    sep=',',
-                                   columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                   columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                                    index=False,
                                    header=False)
-
             df_sintel_train_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_train.csv',
                                            sep=',',
-                                           columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                           columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                                            index=False,
                                            header=False)
             df_sintel_valid_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_valid.csv',
                                            sep=',',
-                                           columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                           columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                                            index=False,
                                            header=False)
             df_sintel_test_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_test.csv',
                                           sep=',',
-                                          columns=['image_path', 'albedo_label_path', 'shading_label_path'],
+                                          columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
                                           index=False,
                                           header=False)
 
     elif data_set == 'mit':
-        data_dir_mit = data_dir + 'MIT-intrinsic/data/'
-
         # maybe download data if necessary:
         download.maybe_download_and_extract(url=url_mit, download_dir=data_dir)
 
@@ -395,11 +404,11 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
 if __name__ == '__main__':
     # directory where to save csv files:
-    data_dir = 'data/'
+    data_dir = 'data1/'
 
-    # main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
+    main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
     main(data_set='mpi_sintel_shading', data_dir=data_dir,
          create_csv_lists=True)
-    # main(data_set='mpi_sintel_complete', data_dir=data_dir,
-    #      create_csv_lists=True)
-    # main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
+    main(data_set='mpi_sintel_complete', data_dir=data_dir,
+         create_csv_lists=True)
+    main(data_set='mit', data_dir=data_dir, create_csv_lists=True)

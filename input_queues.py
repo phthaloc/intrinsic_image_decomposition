@@ -578,9 +578,9 @@ def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
     """
     Generates a new processed batch of images and labels each time it is
     called (if a DataQueue.dequeue() object is passed).
-    :param deq: typically a DataQueue.dequeue() object which outputs a
-        batch of data in form of a pd.DataFrame() which contains paths
-        of all images and labels.
+    :param deq: typically a DataQueue.dequeue() (format pd.DataFrme!!!) object
+        which outputs a batch of data in form of a pd.DataFrame() which contains
+        paths of all images and labels.
     :type deq: DataQueue.dequeue() object
     :param shape: Spatial output shape of the image/stacked images.
     :type shape: If output_shape=None (default) the output image/stacked
@@ -601,9 +601,10 @@ def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
         underlying function sp.ndimage._nd_image.geometric_transform() take
         by far most of the time)
     """
-    img_batch = []
-    alb_batch = []
-    shad_batch = []
+    batches = []
+    for i in deq:
+        batches.append([])
+
     for row in deq.values:
         # read images (image + labels):
         imgs = [sp.misc.imread(name=path, flatten=False,
@@ -621,8 +622,7 @@ def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
         imgs_splitted = np.split(ary=imgs_stacked,
                                  indices_or_sections=split_points,
                                  axis=2)
-        img_batch.append(imgs_splitted[0])
-        alb_batch.append(imgs_splitted[1])
-        shad_batch.append(imgs_splitted[2])
-    return np.stack(img_batch), np.stack(alb_batch), np.stack(shad_batch)
+        for i, col in enumerate(deq):
+            batches[i].append(imgs_splitted[i])
+    return (np.stack(batch) for batch in batches)
 
