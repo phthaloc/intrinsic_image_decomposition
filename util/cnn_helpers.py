@@ -17,7 +17,8 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
 
-__all__ = ['conv2d_layer', 'loss_fct'] 
+__all__ = ['conv2d_layer', 'get_valid_pixels', 'berhu_loss', 'mse_reg',
+           'loss_fct']
 
 
 def conv2d_layer(inputs,
@@ -178,31 +179,194 @@ def conv2d_layer(inputs,
     return act
 
 
-def loss_fct(label_albedo,
-             label_shading,
-             prediction_albedo,
-             prediction_shading,
-             lambda_):
+# def loss_fct(label_albedo,
+#              label_shading,
+#              prediction_albedo,
+#              prediction_shading,
+#              lambda_):
+#     """
+#     Computes loss function (it compares ground truth (labels) to predictions
+#     y)
+#     """
+#     with tf.name_scope('loss'):
+#         mse_alb = tf.reduce_mean(tf.square(prediction_albedo - label_albedo))
+#         reduced_alb = tf.square(tf.reduce_mean(prediction_albedo - label_albedo))
+#
+#         mse_shad = tf.reduce_mean(tf.square(prediction_shading - label_shading))
+#         reduced_shad = tf.square(tf.reduce_mean(prediction_shading - label_shading))
+#
+#         # least square loss if lambda_ = 0, scale invariant loss if
+#         # lambda_ = 1, average of both if lambda_ = 0.5:
+#         loss = (mse_alb - lambda_ * reduced_alb) + (mse_shad - lambda_ * reduced_shad)
+#         # create summaries that give outputs (TensorFlow ops that output
+#         # protocol buffers containing 'summarized' data) of some scalar
+#         # parameters, like evolution of loss function (how does it change
+#         # over time? / rather not weights  because there are usually several
+#         # of them) etc (tf.summary.scalar())
+#         # (have a look at parameters that change over time (= training
+#         # steps))
+#         tf.summary.scalar(name='loss', tensor=loss)
+#     return loss
+
+
+def get_valid_pixels(image, invalid_mask=None):
+    """
+    :param image:
+    :param invalid_mask:
+    """
+    # generate a mask with {0, 1} (if label>0: 1, else 0)
+    # mask that decodes positive/negative values in labels (should be always in
+    # [0,1] range):
+    # (tf.where: Return the elements, either from x or y, depending on the
+    # condition)
+    valid = tf.where(condition=tf.greater_equal(image, 0.),
+                     x=tf.ones_like(image),
+                     y=tf.zeros_like(image))
+    if invalid_mask is not None:
+        # in the invalid masks mark pixels that have values >0 with 0 (invalid
+        # pixels) and pixels that have values==0 with 1 (valid pixels):
+        valid = tf.where(condition=tf.greater(invalid_mask, 0.),
+                         x=tf.zeros_like(invalid_mask),
+                         y=valid)
+    return valid
+
+
+def berhu_loss(label, prediction, valid_mask=None, log=True):
+    """
+    :param label: ground truth label image
+    :type label: np.array or tf tensor RGB image
+    :param prediction: prediction (network output) of label image
+    :type prediction: np.array or tf tensor RGB image
+    :param valid_mask: binary map with 0 for invalid pixels that are not
+        considered calculating the loss and 1 for valid pixels (default: None)
+    :type valid_mask: np.array or tf tensor image
+    :param log: calculate loss in log space (take elementwise natural log
+        of label and prediction) (default: True)
+    :type log: bool
+    """
+    if log:
+        # define offset to ensure that there will be no log(0)=-inf:
+        offset = 0.5
+        # natural logarithm (base e):
+        # take abs value to ensure that there will be no log(-x):
+        label = tf.log(tf.abs(label) + offset)
+        prediction = tf.log(tf.abs(prediction) + offset)
+
+    # Calculate absolute difference between prediction and label:
+    diff = tf.abs(prediction - label)
+    # get limit where L1 / L2 loss will be applied:
+    lim = 0.2 * tf.reduce_max(diff)
+    # apply L2 loss to regions where difference is > lim,
+    # else (regions with absolute diff <= lim) apply L1:
+    loss = tf.where(condition=tf.greater(diff, lim),
+                    x=0.5 * ((diff ** 2 / lim) + lim),
+                    y=diff)
+
+    if valid_mask is not None:
+        # get rid of invalid pixels (which do not contribute to loss):
+        loss_valid = tf.multiply(valid_mask, loss)
+        # count number of valid pixels (needed to get mean loss later):
+        n_valid = tf.reduce_sum(valid_mask)
+        # get BerHu loss:
+        berhu_loss = tf.reduce_sum(loss_valid) / n_valid
+    else:
+        berhu_loss = tf.reduce_mean(loss)
+    return berhu_loss
+
+
+def mse_reg(label, prediction, lambda_, valid_mask=None, log=True):
     """
     Computes loss function (it compares ground truth (labels) to predictions
     y)
+    :param label: ground truth label image
+    :type label: np.array or tf tensor RGB image
+    :param prediction: prediction (network output) of label image
+    :type prediction: np.array or tf tensor RGB image
+    :param lambda_: regularizer (least square loss if lambda_ = 0, scale
+        invariant loss if lambda_ = 1, average of both if lambda_ = 0.5)
+    :type lambda_: float (elemm [0, 1])
+    :param valid_mask: binary map with 0 for invalid pixels that are not
+        considered calculating the loss and 1 for valid pixels (default: None)
+    :type valid_mask: np.array or tf tensor image
+    :param log: calculate loss in log space (take elementwise natural log
+        of label and prediction) (default: True)
+    :type log: boolean
+
     """
-    with tf.name_scope('loss'):
-        mse_alb = tf.reduce_mean(tf.square(prediction_albedo - label_albedo))
-        reduced_alb = tf.square(tf.reduce_mean(prediction_albedo - label_albedo))
+    if log:
+        # define offset to ensure that there will be no log(0)=-inf:
+        offset = 0.5
+        # natural logarithm (base e):
+        # take abs value to ensure that there will be no log(-x):
+        label = tf.log(tf.abs(label) + offset)
+        prediction = tf.log(tf.abs(prediction) + offset)
 
-        mse_shad = tf.reduce_mean(tf.square(prediction_shading - label_shading))
-        reduced_shad = tf.square(tf.reduce_mean(prediction_shading - label_shading))
+    diff = prediction - label
 
-        # least square loss if lambda_ = 0, scale invariant loss if
-        # lambda_ = 1, average of both if lambda_ = 0.5:
-        loss = (mse_alb - lambda_ * reduced_alb) + (mse_shad - lambda_ * reduced_shad)
-        # create summaries that give outputs (TensorFlow ops that output
-        # protocol buffers containing 'summarized' data) of some scalar 
-        # parameters, like evolution of loss function (how does it change 
-        # over time? / rather not weights  because there are usually several
-        # of them) etc (tf.summary.scalar())
-        # (have a look at parameters that change over time (= training
-        # steps))
-        tf.summary.scalar(name='loss', tensor=loss)
+    if valid_mask is not None:
+        # get rid of invalid pixels (which do not contribute to loss):
+        diff_valid = tf.multiply(valid_mask, diff)
+        # count number of valid pixels (needed to get mean loss later):
+        n_valid = tf.reduce_sum(valid_mask)
+        mse = tf.reduce_sum(tf.square(diff_valid)) / n_valid
+        reduced = tf.square(tf.reduce_sum(diff_valid) / n_valid)
+    else:
+        mse = tf.reduce_mean(tf.square(diff))
+        reduced = tf.square(tf.reduce_mean(diff))
+
+    return mse - lambda_ * reduced
+
+
+def loss_fct(label_albedo, label_shading, prediction_albedo,
+             prediction_shading, lambda_, loss_type, valid_mask=None, log=True):
+    """
+    Computes loss function (it compares ground truth (labels) to predictions
+    y)
+    :param label_albedo: ground truth albedo label image
+    :type label_albedo: np.array or tf tensor RGB image
+    :param label_shading: ground truth shading label image
+    :type label_shading: np.array or tf tensor RGB image
+    :param prediction_albedo: prediction (network output) of albedo label image
+    :type prediction_albedo: np.array or tf tensor RGB image
+    :param prediction_shading: prediction (network output) of shading label
+        image
+    :type prediction_shading: np.array or tf tensor RGB image
+    :param lambda_: regularizer (least square loss if lambda_ = 0, scale
+        invariant loss if lambda_ = 1, average of both if lambda_ = 0.5)
+    :type lambda_: float (elemm [0, 1])
+    :param loss_type: elem {'mse', 'berhu'}
+    :type loss_type: str
+    :param valid_mask: binary map with 0 for invalid pixels that are not
+        considered calculating the loss and 1 for valid pixels (default: None)
+    :type valid_mask: np.array or tf tensor image
+    :param log: calculate loss in log space (take elementwise natural log
+        of label and prediction) (default: True)
+    :type log: boolean
+    """
+    if loss_type == 'mse':
+        loss_albedo = mse_reg(label=label_albedo, prediction=prediction_albedo,
+                              lambda_=lambda_, valid_mask=valid_mask, log=log)
+        loss_shading = mse_reg(label=label_shading,
+                               prediction=prediction_shading, lambda_=lambda_,
+                               valid_mask=valid_mask, log=log)
+    elif loss_type == 'berhu':
+        loss_albedo = berhu_loss(label=label_albedo,
+                                 prediction=prediction_albedo,
+                                 valid_mask=valid_mask, log=log)
+        loss_shading = berhu_loss(label=label_shading,
+                                  prediction=prediction_shading,
+                                  valid_mask=valid_mask, log=log)
+    else:
+        raise TypeError("Enter valid loss_type ('mse', 'berhu').")
+
+    loss = loss_albedo + loss_shading
+    # create summaries that give outputs (TensorFlow ops that output
+    # protocol buffers containing 'summarized' data) of some scalar
+    # parameters, like evolution of loss function (how does it change
+    # over time? / rather not weights  because there are usually several
+    # of them) etc (tf.summary.scalar())
+    # (have a look at parameters that change over time (= training
+    # steps))
+    tf.summary.scalar(name='loss', tensor=loss)
     return loss
+
