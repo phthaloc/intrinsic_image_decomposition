@@ -284,7 +284,7 @@ class SintelDataInputQueue(DataInputQueue):
         :return: tf tensor that holds the preprocessed image.
         """
         # scale image to [0, 1]:
-        # image = image / 255
+        # image = image / 256
         return image
 
     def preprocess_label(self, label):
@@ -341,7 +341,7 @@ class SintelDataInputQueue(DataInputQueue):
 
 
         # scale image to [0, 1]:
-        combined_img = combined_img / 255
+        combined_img = combined_img / 256
 
         if data_augmentation:
             # randomly mirror image horizontally:
@@ -569,7 +569,7 @@ def process_image(image, is_flip=True, is_rotated=True, output_shape=None,
                       x_start:x_start + output_shape[1], :]
 
     if norm:
-        image = image / 255
+        image = image / 256
 
     return image
 
