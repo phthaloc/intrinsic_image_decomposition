@@ -62,8 +62,8 @@ logger.debug('Python version: \n    ' + sys.version +
 
 # data path constants:
 # DATA_DIR = '../data/mnist/'
-# DATA_DIR = 'data/'
-DATA_DIR = '/usr/udo/data/'
+DATA_DIR = 'data1/'
+# DATA_DIR = '/usr/udo/data/'
 PREDICT_PATH = ''
 path_inference_graph = ['logs/inference_graphs/narihira2015/' +
                         'tfmodel_inference.meta']
@@ -86,8 +86,14 @@ IMAGE_SHAPE = [32 * m_height, 32 * m_width, 3]  # complete image size
     # [436, 1024, 3] # Narihira2015 use [M*32=13*32=416, 416, 3]
 logger.info('Trained on images of shape: {}'.format(IMAGE_SHAPE))
 
-INITIAL_LEARNING_RATE = 1e-3
+INITIAL_LEARNING_RATE = 1e-5
 logger.info('Initial learning rate: {}'.format(INITIAL_LEARNING_RATE))
+
+LOSS_TYPE = 'berhu'  # or 'mse'
+logger.info('Type of loss function: {}'.format(LOSS_TYPE))
+
+LOSS_LAMBDA = 0.5  # or 0 or 1
+logger.info('Loss regularizer lambda value: {}'.format(LOSS_LAMBDA))
 
 # probability that a neuron's output is kept during dropout (only during 
 # training!!!, testing/validation -> 1.0):
@@ -96,17 +102,24 @@ BATCH_SIZE = 8  # nr of data which is put through the network before updating
     # it, as default use: 32. 
     # BATCH_SIZE determines how many data samples are loaded in the memory (be 
     # careful with memory space)
-    
-NUM_EPOCHS = 2  # nr of times the training process loops through the 
+logger.info('Batch size: {}'.format(BATCH_SIZE))
+
+NUM_EPOCHS = 1  # nr of times the training process loops through the 
     # complete training data set (how often is the tr set 'seen')
     # if you have 1000 training examples, and your batch size is 500, then it
     # will take 2 iterations to complete 1 epoch.
+logger.info('# Epochs: {}'.format(NUM_EPOCHS))
 
 DISPLAY_STEP = 2  # every DIPLAY_STEP'th training iteration information is 
     # printed (default: 100)
+logger.info('Report training set loss every {} iteration.'.format(DISPLAY_STEP))
+
 SUMMARY_STEP = 2  # every SUMMARY_STEP'th training iteration a summary file is 
     # written to LOGS_PATH
+logger.info('Write summary for all summarized (except validation data ' +
+            'set summaries) to file every {}-th iteration.'.format(SUMMARY_STEP))
 DEVICE = '/cpu:0'  # device on which the variable is saved/processed
+logger.info('Device setting: {}'.format(DEVICE))
 
 
 # In[2]:
@@ -175,6 +188,11 @@ y_shading_label = tf.placeholder(dtype=tf.float32,
 # valid/test mode (training=False) this indicator is important if dropout or/and
 # batch normalization is used.
 training = graph.get_tensor_by_name(name='is_training:0')
+
+invalid_px_mask = tf.placeholder(dtype=tf.float32, 
+                                 shape=[None] + IMAGE_SHAPE, 
+                                 name='invalid_px_mask')
+
 # get graph output nodes:
 y_albedo_pred = graph.get_tensor_by_name(name='deconv_s2out_albedo/BiasAdd:0')
 y_shading_pred = graph.get_tensor_by_name(name='deconv_s2out_shading/BiasAdd:0')
@@ -188,11 +206,21 @@ y_shading_pred = graph.get_tensor_by_name(name='deconv_s2out_shading/BiasAdd:0')
 # In[7]:
 
 
-loss = cnnhelp.loss_fct(label_albedo=y_albedo_label, 
-                        label_shading=y_shading_label, 
+valid_mask = cnnhelp.get_valid_pixels(image=x, invalid_mask=invalid_px_mask)
+loss = cnnhelp.loss_fct(label_albedo=y_albedo_label,
+                        label_shading=y_shading_label,
                         prediction_albedo=y_albedo_pred, 
-                        prediction_shading=y_shading_pred, 
-                        lambda_=0.5)
+                        prediction_shading=y_shading_pred,
+                        lambda_=LOSS_LAMBDA,
+                        loss_type=LOSS_TYPE, 
+                        valid_mask=valid_mask, 
+                        log=True)
+
+# loss = cnnhelp.loss_fct(label_albedo=y_albedo_label, 
+#                         label_shading=y_shading_label, 
+#                         prediction_albedo=y_albedo_pred, 
+#                         prediction_shading=y_shading_pred, 
+#                         lambda_=0.5)
 logger.debug('Defined loss.')
 
 # Use an AdamOptimizer to train the network:
@@ -240,16 +268,19 @@ logger.debug('Finished building training graph.')
 logger.info('Total parameters of network: {}'.format(nnhelp.network_params()))
 
 
-# In[12]:
+# In[11]:
 
 
 # import data:
 # import training data:
 file = 'sample_data_sintel_shading_train.csv'
 df_train = pd.read_csv(DATA_DIR + file, sep=',', header=None,
-                       names=['img', 'alb', 'shad'])
+                       names=['img', 'alb', 'shad', 'invalid'])
 # compolete image paths:
 df_train = DATA_DIR + df_train
+# enable this line to train on only one image (if enabled, do not forget
+# to set BATCH_SIZE = 1):
+# df_train = df_train.loc[[0]]
 # instantiate a data queue for feeding data in (mini) batches to cnn:
 data_train = iq.DataQueue(df=df_train, batch_size=BATCH_SIZE,
                           num_epochs=NUM_EPOCHS)
@@ -262,7 +293,7 @@ logger.debug('Imported training data from\n    {}'.format(DATA_DIR + file))
 #     to calculate the error/accuracy on the validation set
 file = 'sample_data_sintel_shading_valid.csv'
 df_valid = pd.read_csv(DATA_DIR + file, sep=',', header=None,
-                       names=['img', 'alb', 'shad'])
+                       names=['img', 'alb', 'shad', 'invalid'])
 # compolete image paths:
 df_valid = DATA_DIR + df_valid
 # instantiate a data queue for feeding data in (mini) batches to cnn:
@@ -270,16 +301,21 @@ data_valid = iq.DataQueue(df=df_valid, batch_size=BATCH_SIZE,
                           num_epochs=NUM_EPOCHS)
 logger.debug('Imported validation data from\n    {}'.format(DATA_DIR + file))
 
-# testing data set: 
-file = 'sample_data_sintel_shading_test.csv'
-df_test = pd.read_csv(DATA_DIR + file, sep=',', header=None,
-                      names=['img', 'alb', 'shad'])
-# compolete image paths:
-df_test = DATA_DIR + df_test
-# instantiate a data queue for feeding data in (mini) batches to cnn:
-data_test = iq.DataQueue(df=df_test, batch_size=BATCH_SIZE,
-                         num_epochs=1)
-logger.debug('Imported testing data from\n    {}'.format(DATA_DIR + file))
+# # testing data set: 
+# file = 'sample_data_sintel_shading_test.csv'
+# df_test = pd.read_csv(DATA_DIR + file, sep=',', header=None,
+#                       names=['img', 'alb', 'shad', 'invalid'])
+# # compolete image paths:
+# df_test = DATA_DIR + df_test
+# # instantiate a data queue for feeding data in (mini) batches to cnn:
+# data_test = iq.DataQueue(df=df_test, batch_size=BATCH_SIZE,
+#                          num_epochs=1)
+# logger.debug('Imported testing data from\n    {}'.format(DATA_DIR + file))
+
+
+# In[12]:
+
+
 
 ################################################################################
 logger.info('Start training:')
@@ -317,9 +353,9 @@ with tf.Session(config=config) as sess:
     ############################################################################
     # Training:
     # train loop
-    #     train for until all data is used
-    #     number of iterations depends on number of data, number of epochs and 
-    #     batch size:
+    # train until all data is processed (queue empty),
+    # number of iterations depends on number of data, number of epochs and 
+    # batch size:
     iter_start = data_train.iter_left
     logger.info('For training it takes {}\n'.format(iter_start) +
                 '    (= # data / batch_size * epochs) iterations to loop ' +
@@ -335,11 +371,11 @@ with tf.Session(config=config) as sess:
         try:
             # take a (mini) batch of the training data:
             deq_train = data_train.dequeue()
-            img_batch, alb_batch, shad_batch = iq.next_batch(deq=deq_train, 
-                                                             shape=IMAGE_SHAPE, 
-                                                             is_flip=True, 
-                                                             is_rotated=False,
-                                                             norm=True)
+            img_b, alb_b, shad_b, inv_b = iq.next_batch(deq=deq_train, 
+                                                        shape=IMAGE_SHAPE, 
+                                                        is_flip=True, 
+                                                        is_rotated=True,
+                                                        norm=True)
             # run training/optimization step:
             # Run one step of the model.  The return values are the activations
             # from the `train_op` (which is discarded) and the `loss` Op.  To
@@ -347,18 +383,20 @@ with tf.Session(config=config) as sess:
             # in the list passed to sess.run() and the value tensors will be
             # returned in the tuple from the call.
 
-            feed_dict = {x: img_batch,
-                         y_albedo_label: alb_batch,
-                         y_shading_label: shad_batch,
+            feed_dict = {x: img_b,
+                         y_albedo_label: alb_b,
+                         y_shading_label: shad_b,
+                         invalid_px_mask: inv_b,
                          training: True}
             sess.run(opt_step, feed_dict=feed_dict)
 
             # report training set accuracy every DISPLAY_STEP-th step:
             if (data_train.num_iter) % DISPLAY_STEP == 0:
                 # console output:
-                feed_dict = {x: img_batch,
-                             y_albedo_label: alb_batch,
-                             y_shading_label: shad_batch,
+                feed_dict = {x: img_b,
+                             y_albedo_label: alb_b,
+                             y_shading_label: shad_b,
+                             invalid_px_mask: inv_b,
                              training: False}
                 train_loss = sess.run(loss, 
                                       feed_dict=feed_dict)
@@ -399,15 +437,16 @@ with tf.Session(config=config) as sess:
                     lst = iq.next_batch(deq=data_valid.dequeue(), 
                                         shape=IMAGE_SHAPE, 
                                         is_flip=True,
-                                        is_rotated=False,
+                                        is_rotated=True,
                                         norm=True)
-                    img_batch_val, alb_batch_val, shad_batch_val = lst
+                    img_b_val, alb_b_val, shad_b_val, inv_b_val = lst
                     
                     # calculate the mean loss of this validation batch and sum 
                     # it with the previous mean batch losses:
-                    feed_dict = {x: img_batch_val,
-                                 y_albedo_label: alb_batch_val,
-                                 y_shading_label: shad_batch_val,
+                    feed_dict = {x: img_b_val,
+                                 y_albedo_label: alb_b_val,
+                                 y_shading_label: shad_b_val,
+                                 invalid_px_mask: inv_b_val,
                                  training: False}
                     validation_loss += sess.run(loss, 
                                                 feed_dict=feed_dict)
@@ -435,9 +474,10 @@ with tf.Session(config=config) as sess:
                 start_time = time.time()
 
             if data_train.num_iter % SUMMARY_STEP == 0:
-                feed_dict = {x: img_batch,  
-                             y_albedo_label: alb_batch,
-                             y_shading_label: shad_batch, 
+                feed_dict = {x: img_b,  
+                             y_albedo_label: alb_b,
+                             y_shading_label: shad_b,
+                             invalid_px_mask: inv_b,
                              training: False}
                 s = sess.run(merge_train_summaries, feed_dict=feed_dict)
                 # adds a Summary protocol buffer to the event file 
@@ -455,10 +495,4 @@ with tf.Session(config=config) as sess:
                         '{}.'.format(end_total_time))
             break
 logger.info('Finished training.')
-
-
-# In[14]:
-
-
-# !tensorboard --logdir ./logs/1
 
