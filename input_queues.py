@@ -563,8 +563,14 @@ def process_image(image, is_flip=True, is_rotated=True, output_shape=None,
 
     # randomly crop image to output shape:
     if output_shape:
-        y_start = np.random.randint(image.shape[0] - output_shape[0])
-        x_start = np.random.randint(image.shape[1] - output_shape[1])
+        if image.shape[0]!=output_shape[0]:
+            y_start = np.random.randint(image.shape[0] - output_shape[0])
+        else:
+            y_start = 0
+        if image.shape[1]!=output_shape[1]:
+            x_start = np.random.randint(image.shape[1] - output_shape[1])
+        else:
+            x_start = 0
         image = image[y_start:y_start + output_shape[0],
                       x_start:x_start + output_shape[1], :]
 
