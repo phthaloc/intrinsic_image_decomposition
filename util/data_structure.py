@@ -95,6 +95,55 @@ def create_datasets(df, p_train, p_valid, p_test, sample=True):
             df_test_sample)
 
 
+def create_datasets_sintel(df):
+    """
+    Splits a data set df into training, validation and testing data set with
+    relative cardinality p_train, p_valid and p_test, respectively.
+    :param df: complete data set which should be split into training, validation
+        and testing sets
+    :type df: pd.DataFrame()
+
+    """
+    # for sintel data set split training/validation/testing
+    # sets by scene:
+    sintel_scenes = dict(
+        train=['alley_1', 'alley_2', 'ambush_2', 'ambush_4',
+               'ambush_5', 'ambush_6', 'ambush_7', 'bamboo_1',
+               'bandage_1', 'bandage_2', 'cave_2', 'cave_4',
+               'market_2', 'market_6', 'shaman_2', 'shaman_3',
+               'sleeping_1', 'sleeping_2', 'temple_2', 'temple_3'],
+        valid=['bamboo_2', 'market_5', 'mountain_1'])
+    # get training validation and testing data set of the mpi-sintel
+    # data:
+    # create training set by filtering for 'training' scenes:
+    df_train = df[df['scene_c'].isin(sintel_scenes['train'])]
+    # delete irrelevant columns and shuffle data set randomly:
+    df_train = df_train.drop('scene_c', axis=1).sample(frac=1)
+    # create validation set by filtering for 'validation' scenes:
+    df_valid_filtered = df[df['scene_c'].isin(sintel_scenes['valid'])]
+    # delete irrelevant columns and shuffle data set randomly:
+    df_valid = df_valid_filtered.drop('scene_c', axis=1).sample(frac=1)
+    # create test set from validation set by randomly sampling 5 elements
+    # from each of the validation scene:
+    df_test = df_valid_filtered.groupby('scene_c').apply(lambda x: x.sample(n=5))
+    # delete irrelevant columns
+    df_test.drop('scene_c', axis=1, inplace=True)
+    # delete multi index:
+    df_test.index = df_test.index.droplevel(level=0)
+    # delete rows from validation set that are now in testing set:
+    df_valid = df_valid[~df_valid.index.isin(df_test.index)]
+
+    # get sample training data set:
+    df_train_sample = df_train.sample(n=50, frac=None, replace=False,
+                                      weights=None, random_state=42, axis=0)
+    # get sample validation data set:
+    df_valid_sample = df_valid.sample(n=20, frac=None, replace=False,
+                                      weights=None, random_state=42, axis=0)
+    # get sample testing data set (same as testing set because of low # of data):
+    df_test_sample = df_test
+    return df_train, df_valid, df_test, df_train_sample, df_valid_sample, df_test_sample
+
+
 def main(data_set, data_dir='data/', create_csv_lists=True):
     # urls for all data sets:
     url_iiw = 'http://labelmaterial.s3.amazonaws.com/release/iiw-dataset-release-0.zip'
@@ -106,7 +155,7 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
     url_sintel_shading = 'http://files.is.tue.mpg.de/jwulff/sintel/extras/MPI-Sintel-training_shading.zip'
 
     url_mit = 'http://people.csail.mit.edu/rgrosse/intrinsic/intrinsic-data.tar.gz'
-        
+
     # directory of data
     data_dir_sintel_complete = data_dir + 'mpi-sintel-complete/'
     data_dir_sintel_shading = data_dir + 'mpi-sintel-shading/'
@@ -131,16 +180,16 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
             # get training validation and testing data set of the iiw data:
             df_iiw_train, df_iiw_valid, df_iiw_test, df_iiw_train_sample, \
-                df_iiw_valid_sample, \
-                df_iiw_test_sample = create_datasets(df=df_iiw, p_train=0.8,
-                                                     p_valid=0.1,
-                                                     p_test=0.1,
-                                                     sample=True)
+            df_iiw_valid_sample, \
+            df_iiw_test_sample = create_datasets(df=df_iiw, p_train=0.8,
+                                                 p_valid=0.1,
+                                                 p_test=0.1,
+                                                 sample=True)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
             df_iiw.to_csv(path_or_buf=data_dir + 'data_iiw_complete.csv',
-                          sep=',', columns=['image_path', 'label_path'], 
+                          sep=',', columns=['image_path', 'label_path'],
                           index=False, header=False)
             df_iiw_train.to_csv(path_or_buf=data_dir + 'data_iiw_train.csv',
                                 sep=',', columns=['image_path', 'label_path'],
@@ -161,7 +210,7 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                                        columns=['image_path', 'label_path'],
                                        index=False, header=False)
             df_iiw_test_sample.to_csv(path_or_buf=data_dir + 'sample_data_iiw_test.csv',
-                                      sep=',', 
+                                      sep=',',
                                       columns=['image_path', 'label_path'],
                                       index=False, header=False)
 
@@ -178,25 +227,22 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                                        os.path.relpath(x, data_dir).replace('clean', 'invalid')
                                        ] for x in glob.glob(data_dir_sintel_complete + 'training/clean/**/*.png')],
                                      columns=['image_path', 'label_path', 'invalid_path'])
+            # add scene to dataframe (for splitting into train/valid/test sets):
+            df_sintel['scene_c'] = df_sintel['image_path'].apply(lambda row: row.split('/')[-2:-1]).apply(pd.Series)
 
             # get training validation and testing data set of the mpi-sintel
             #  data:
-            df_sintel_train, df_sintel_valid, df_sintel_test, \
-            df_sintel_train_sample, df_sintel_valid_sample, \
-            df_sintel_test_sample = create_datasets(df=df_sintel,
-                                                    p_train=0.8,
-                                                    p_valid=0.1,
-                                                    p_test=0.1,
-                                                    sample=True)
+            df_sintel_train, df_sintel_valid, df_sintel_test, df_sintel_train_sample, \
+                df_sintel_valid_sample, df_sintel_test_sample = create_datasets_sintel(df_sintel)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
 
             df_sintel.to_csv(path_or_buf=data_dir + 'data_sintel_complete_complete.csv',
-                 sep=',',
-                 columns=['image_path', 'label_path', 'invalid_path'],
-                 index=False,
-                 header=False)
+                             sep=',',
+                             columns=['image_path', 'label_path', 'invalid_path'],
+                             index=False,
+                             header=False)
             df_sintel_train.to_csv(path_or_buf=data_dir + 'data_sintel_complete_train.csv',
                                    sep=',',
                                    columns=['image_path', 'label_path', 'invalid_path'],
@@ -232,11 +278,13 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
             df_sintel_test_unknown = pd.DataFrame([[os.path.relpath(x, data_dir),
                                                     None,
                                                     None
-                                                    ] for x in glob.glob(data_dir_sintel_complete + 'test/clean/**/*.png')],
+                                                    ] for x in
+                                                   glob.glob(data_dir_sintel_complete + 'test/clean/**/*.png')],
                                                   columns=['image_path', 'label_path', 'invalid_path'])
 
             df_sintel_test_unknown.to_csv(path_or_buf=data_dir + 'data_sintel_complete_test_unknown.csv', sep=',',
-                                          columns=['image_path', 'label_path', 'invalid_path'], index=False, header=False)
+                                          columns=['image_path', 'label_path', 'invalid_path'], index=False,
+                                          header=False)
 
     elif data_set == 'mpi_sintel_shading':
 
@@ -260,33 +308,41 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
         if create_csv_lists:
             # import images and labels separateley:
             df_clean = pd.DataFrame(
-                [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_shading + 'clean_noshadingtextures/**/*.png')],
+                [os.path.relpath(x, data_dir) for x in
+                 glob.glob(data_dir_sintel_shading + 'clean_noshadingtextures/**/*.png')],
                 columns=['image_path'])
-            df_clean[['scene', 'frame']] = df_clean['image_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+            df_clean[['scene', 'frame']] = df_clean['image_path'].apply(lambda row: row.split('/')[-2:]).apply(
+                pd.Series)
             df_albedo = pd.DataFrame([os.path.relpath(x, data_dir) for x in
                                       glob.glob(data_dir_sintel_shading + 'albedo_noshadingtextures/**/*.png')],
                                      columns=['albedo_label_path'])
-            df_albedo[['scene', 'frame']] = df_albedo['albedo_label_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+            df_albedo[['scene', 'frame']] = df_albedo['albedo_label_path'].apply(lambda row: row.split('/')[-2:]).apply(
+                pd.Series)
             df_shading = pd.DataFrame(
                 [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_shading + 'shading/**/*.png')],
                 columns=['shading_label_path'])
-            df_shading[['scene', 'frame']] = df_shading['shading_label_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+            df_shading[['scene', 'frame']] = df_shading['shading_label_path'].apply(
+                lambda row: row.split('/')[-2:]).apply(pd.Series)
             try:
                 df_invalid = pd.DataFrame(
-                    [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
+                    [os.path.relpath(x, data_dir) for x in
+                     glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
                     columns=['invalid_path'])
-                df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+                df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(
+                    lambda row: row.split('/')[-2:]).apply(pd.Series)
             except KeyError:
                 print('We need to download and extract the ' +
                       'mpi_sintel_complete dataset first to get the invalid ' +
                       'pixel mask.')
                 main(data_set='mpi_sintel_complete',
-                     data_dir=data_dir, 
+                     data_dir=data_dir,
                      create_csv_lists=False)
                 df_invalid = pd.DataFrame(
-                    [os.path.relpath(x, data_dir) for x in glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
+                    [os.path.relpath(x, data_dir) for x in
+                     glob.glob(data_dir_sintel_complete + 'training/invalid/**/*.png')],
                     columns=['invalid_path'])
-                df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(lambda row: row.split('/')[-2:]).apply(pd.Series)
+                df_invalid[['scene', 'frame']] = df_invalid['invalid_path'].apply(
+                    lambda row: row.split('/')[-2:]).apply(pd.Series)
 
             # get list which contains scenes which have to be deleted:
             lst_del = [list(df_albedo[~df_albedo['scene'].isin(df_clean['scene'].unique())]['scene'].unique()) +
@@ -312,22 +368,18 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
             # merge all four DataFrames and keep just important paths:
             df_merged = df_clean.merge(df_albedo, left_index=True,
-                                       right_index=True, how='inner')
+                                       right_index=True, how='inner',
+                                       suffixes=('_c', '_a'))
             df_merged = df_merged.merge(df_shading, left_index=True,
-                                        right_index=True, how='inner')
+                                        right_index=True, how='inner',
+                                        suffixes=('', '_s'))
             df_sintel2 = df_merged.merge(df_invalid, left_index=True,
-                                         right_index=True, how='inner')[
-                ['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path']]
+                                         right_index=True, how='inner',
+                                         suffixes=('_s', '_i'))[
+                ['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path', 'scene_c']]
 
-            # get training validation and testing data set of the mpi-sintel
-            # data:
-            df_sintel_train2, df_sintel_valid2, df_sintel_test2, \
-            df_sintel_train_sample2, df_sintel_valid_sample2, \
-            df_sintel_test_sample2 = create_datasets(df=df_sintel2,
-                                                     p_train=0.8,
-                                                     p_valid=0.1,
-                                                     p_test=0.1,
-                                                     sample=True)
+            df_sintel_train2, df_sintel_valid2, df_sintel_test2, df_sintel_train_sample2, \
+                df_sintel_valid_sample2, df_sintel_test_sample2 = create_datasets_sintel(df_sintel2)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
@@ -353,17 +405,20 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
                                    header=False)
             df_sintel_train_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_train.csv',
                                            sep=',',
-                                           columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
+                                           columns=['image_path', 'albedo_label_path', 'shading_label_path',
+                                                    'invalid_path'],
                                            index=False,
                                            header=False)
             df_sintel_valid_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_valid.csv',
                                            sep=',',
-                                           columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
+                                           columns=['image_path', 'albedo_label_path', 'shading_label_path',
+                                                    'invalid_path'],
                                            index=False,
                                            header=False)
             df_sintel_test_sample2.to_csv(path_or_buf=data_dir + 'sample_data_sintel_shading_test.csv',
                                           sep=',',
-                                          columns=['image_path', 'albedo_label_path', 'shading_label_path', 'invalid_path'],
+                                          columns=['image_path', 'albedo_label_path', 'shading_label_path',
+                                                   'invalid_path'],
                                           index=False,
                                           header=False)
 
@@ -380,8 +435,8 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
             # get training validation and testing data set of the mit data:
             df_mit_train, df_mit_valid, df_mit_test, _, _, \
-                _ = create_datasets(df=df_mit, p_train=0.8,
-                                    p_valid=0.1, p_test=0.1, sample=False)
+            _ = create_datasets(df=df_mit, p_train=0.8,
+                                p_valid=0.1, p_test=0.1, sample=False)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
@@ -416,7 +471,7 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
 if __name__ == '__main__':
     # directory where to save csv files:
-    data_dir = '/usr/udo/data1/'
+    data_dir = '../data/'
 
     #main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
     main(data_set='mpi_sintel_shading', data_dir=data_dir,
