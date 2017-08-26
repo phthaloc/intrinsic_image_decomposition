@@ -428,6 +428,6 @@ def create_inference_graph(save_path, device='/cpu:0'):
 
 
 if __name__ == "__main__":
-    create_inference_graph(save_path='logs/inference_graphs/narihira2015/',
+    create_inference_graph(save_path='models/narihira2015/',
                            device='/gpu:0')
 
