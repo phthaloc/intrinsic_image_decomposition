@@ -45,7 +45,7 @@ def _print_download_progress(count, block_size, total_size):
 ########################################################################
 
 
-def maybe_download_and_extract(url, download_dir):
+def maybe_download_and_extract(url, download_dir, print_download_progress=True):
     """
     Download and extract the data if it doesn't already exist.
     Assumes the url is a tar-ball file.
@@ -76,9 +76,13 @@ def maybe_download_and_extract(url, download_dir):
             os.makedirs(download_dir)
 
         # Download the file from the internet.
-        file_path, _ = urllib.request.urlretrieve(url=url,
-                                                  filename=file_path,
-                                                  reporthook=_print_download_progress)
+        if print_download_progress:
+            file_path, _ = urllib.request.urlretrieve(url=url,
+                                                      filename=file_path,
+                                                      reporthook=_print_download_progress)
+        else:
+            file_path, _ = urllib.request.urlretrieve(url=url,
+                                                      filename=file_path)
 
         print()
         print("Download finished. Extracting files.")
