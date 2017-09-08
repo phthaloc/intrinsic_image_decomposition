@@ -512,23 +512,58 @@ class DataQueue:
         return df_batch
 
 
-def process_image(image, is_flip=True, is_rotated=True, output_shape=None,
-                  norm=True):
+def image_random_flip(image):
     """
-    Takes an image-like numpy array and processes it if desired.
-    Possible process steps (in this order) are randomly horizontal flipping,
-    rotating the image spatially with angle between [-15, 15] deg, randomly
-    cropping the image to output_shape.
+    Takes an image-like numpy array and flips the image horizontally with
+    probability 0.5.
     :param image: an image-like numpy array with shape [height, width, channels]
         image-like means that we can use in-depth stacked images (eg. channels=9
         for 3 stacked images) to perform the same processing steps
         simultaneously on all stacked images.
     :type image: np.array of shape [height, width, channels]
-    :param is_flip: flag for randomly flipping image horizontally
-    :type is_flip: bool (default: True)
-    :param is_rotated: flag for randomly rotating image by random angle in range
-        [-15, 15] deg
-    :type is_rotated: bool (default: True)
+    :return: randomly flipped np.array image
+    """
+    # flip image horizontally randomly:
+    # bool random number which decides if images should be flipped
+    # horizontally:
+    is_flip = np.random.choice([False, True], p=[0.5, 0.5])
+    # flip image:
+    return image[:, ::-1]
+
+
+def image_random_rotate(image):
+    """
+    Takes an image-like numpy array and rotates it spatially by a random angle 
+    between [-15, 15] deg.
+    :param image: an image-like numpy array with shape [height, width, channels]
+        image-like means that we can use in-depth stacked images (eg. channels=9
+        for 3 stacked images) to perform the same processing steps
+        simultaneously on all stacked images.
+    :type image: np.array of shape [height, width, channels]
+    :return: randomly rotated np.array image
+    ATTENTION: image rotation (function sp.ndimage.interpolation.rotate() and
+        underlying function sp.ndimage._nd_image.geometric_transform() might
+        have a 'long' run-time)
+    """
+    # rotate image by angle degrees:
+    # angle in degrees:
+    angle = np.random.normal(loc=0, scale=15 / 2)
+    return sp.ndimage.interpolation.rotate(input=image, angle=angle,
+                                            axes=(1, 0), reshape=False,
+                                            output=None, order=3,
+                                            mode='constant', cval=0.0,
+                                            prefilter=True)
+
+
+def image_random_crop(image, output_shape):
+    """
+    Takes an image-like numpy array and crops it to the size of output_shape at
+    a random spatial position.
+    :param image: an image-like numpy array with shape [height, width, channels]
+        image-like means that we can use in-depth stacked images (eg. channels=9
+        for 3 stacked images) to perform the same processing steps
+        simultaneously on all stacked images.
+    :type image: np.array of shape [height, width, channels]
     :param output_shape: Spatial output shape of the image/stacked images.
     :type output_shape: If output_shape=None (default) the output image/stacked
         images have the same shape as the input image, otherwise output_shape
@@ -536,51 +571,48 @@ def process_image(image, is_flip=True, is_rotated=True, output_shape=None,
         output image will have shape
         [output_shape[0], output_shape[1], channels] (where channels = input
         channels)
-    :param norm: norm images to [0, 1] range.
-    :type norm: boolean (default: True)
-    :return: processed np.array image
-    ATTENTION: image rotation (function sp.ndimage.interpolation.rotate() and
-        underlying function sp.ndimage._nd_image.geometric_transform() take
-        by far most of the time)
+    :return: randomly cropped np.array image
     """
-    # flip image horizontally randomly:
-    if is_flip:
-        # bool random number which decides if images should be flipped
-        # horizontally:
-        is_flip = np.random.choice([False, True], p=[0.5, 0.5])
-        # flip image:
-        image = image[:, ::-1]
-
-    # rotate image by angle degrees:
-    if is_rotated:
-        # angle in degrees:
-        angle = np.random.normal(loc=0, scale=15 / 2)
-        image = sp.ndimage.interpolation.rotate(input=image, angle=angle,
-                                                axes=(1, 0), reshape=False,
-                                                output=None, order=3,
-                                                mode='constant', cval=0.0,
-                                                prefilter=True)
-
     # randomly crop image to output shape:
-    if output_shape:
-        if image.shape[0]!=output_shape[0]:
-            y_start = np.random.randint(image.shape[0] - output_shape[0])
-        else:
-            y_start = 0
-        if image.shape[1]!=output_shape[1]:
-            x_start = np.random.randint(image.shape[1] - output_shape[1])
-        else:
-            x_start = 0
-        image = image[y_start:y_start + output_shape[0],
-                      x_start:x_start + output_shape[1], :]
-
-    if norm:
-        image = image / 256
-
-    return image
+    if image.shape[0]!=output_shape[0]:
+        y_start = np.random.randint(image.shape[0] - output_shape[0])
+    else:
+        y_start = 0
+    if image.shape[1]!=output_shape[1]:
+        x_start = np.random.randint(image.shape[1] - output_shape[1])
+    else:
+        x_start = 0
+    return image[y_start:y_start + output_shape[0],
+                 x_start:x_start + output_shape[1], :]
 
 
-def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
+def image_normalize(image):
+    """
+    Takes an image-like numpy array and normalizes it (by dividing each pixel
+    throug 256). So, images are normalized to range [0, 1].
+    :param image: an image-like numpy array with shape [height, width, channels]
+        image-like means that we can use in-depth stacked images (eg. channels=9
+        for 3 stacked images) to perform the same processing steps
+        simultaneously on all stacked images.
+    :type image: np.array of shape [height, width, channels]
+    :return: normalized np.array image
+    """
+    return image / 256
+
+
+def image_scale(image, random):
+    """
+    Scales an image by a random (relative) factor between 0.9 and 1.1.
+    :param image: an image [height, width, channels]
+    :type image: np.array of shape [height, width, channels]
+    :return: processed np.array image
+    """
+    return sp.misc.imresize(arr=image, size=rand_scale,
+                            interp='bilinear', mode=None)
+
+    
+def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
+               is_rotated=True, norm=True):
     """
     Generates a new processed batch of images and labels each time it is
     called (if a DataQueue.dequeue() object is passed).
@@ -588,13 +620,21 @@ def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
         which outputs a batch of data in form of a pd.DataFrame() which contains
         paths of all images and labels.
     :type deq: DataQueue.dequeue() object
-    :param shape: Spatial output shape of the image/stacked images.
-    :type shape: If output_shape=None (default) the output image/stacked
-        images have the same shape as the input image, otherwise output_shape
-        must be of type list with at least len(output_shape)==2 elements. The
-        output image will have shape
+    :param output_shape: Spatial output shape of the image/stacked images.
+    :type output_shape: If output_shape=None (default) the output image/stacked
+        images have the same shape as the input image (if is_scale==False),
+        otherwise output_shape must be of type list with at least
+        len(output_shape)==2 elements. The output image will have shape
         [output_shape[0], output_shape[1], channels] (where channels = input
         channels)
+    :param is_scale: scale image by a random (relative) factor between 0.9 and
+        1.1. It is most advisable to only scale images if the out_shape is
+        significantly smaller than the input images, because if the image
+        scaling results in images smaller than the desired output, cropping is
+        not possible.
+        To prevent too small scaled images, images are only scaled if the
+        scaling results in output images >= output_shape
+    :type is_scale: bool (default: True)
     :param is_flip: flag for randomly flipping image horizontally
     :type is_flip: bool (default: True)
     :param is_rotated: flag for randomly rotating image by random angle in range
@@ -616,13 +656,42 @@ def next_batch(deq, shape=None, is_flip=True, is_rotated=True, norm=True):
         imgs = [sp.misc.imread(name=path, flatten=False,
                                mode='RGB') for path in row]
 
+        # if is_scale randomly scale images by factor between 0.9 and 1.1:
+        if is_scale and not output_shape:
+            raise ValueError('If is_scale=True but output_shape=None this ' +
+                             'leads to an inconsistency error. To create ' +
+                             'batches each image in the batch must have the ' +
+                             'same shape.')
+        elif is_scale and output_shape:
+            scale_min = 0.9
+            scale_max = 1.1
+            # scale images in batch with a random scale factor between 0.9
+            # and 1.1:
+            rand_scale = np.random.uniform(low=scale_min, high=scale_max, 
+                                           size=None)
+            # if the scaling gets smaller than the wanted cropping output
+            # (defined by output_shape) than skip scaling (-> rand_scale=1.0):
+            if np.any(np.greater(np.array(output_shape[:-1]), rand_scale * np.array(np.array(imgs).shape[1:3]))):
+                rand_scale = 1.0
+
+            for i, img in enumerate(imgs):
+                imgs[i] = sp.misc.imresize(arr=img, size=rand_scale,
+                                           interp='bilinear', mode=None)
+
         # stack images and labels along depth (channels) to perform the same
         # operations on them:
         imgs_stacked = np.dstack(imgs)
+
         # preprocess images (randomly flip horizontally, rotate and/or crop):
-        imgs_stacked = process_image(image=imgs_stacked, is_flip=is_flip,
-                                     is_rotated=is_rotated, output_shape=shape,
-                                     norm=norm)
+        if is_flip:
+            imgs_stacked = image_random_flip(image=imgs_stacked)
+        if is_rotated:
+            imgs_stacked = image_random_rotate(image=imgs_stacked)
+        if output_shape:
+            imgs_stacked = image_random_crop(image=imgs_stacked,
+                                             output_shape=output_shape)
+        if norm:
+            imgs_stacked = image_normalize(image=imgs_stacked)
         # split images to get [image, albedo, shading]:
         split_points = np.array([img.shape[2] for img in imgs]).cumsum()[:-1]
         imgs_splitted = np.split(ary=imgs_stacked,
