@@ -40,6 +40,8 @@ import datetime
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+get_ipython().magic('matplotlib inline')
+import matplotlib.pyplot as plt
 import input_queues as iq
 import cnn_model
 import plot_helpers as plt_help
@@ -53,40 +55,51 @@ import cnn_helpers as cnnhelp
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-LOGS_PATH = 'logs/1/'  # path to summary files
+LOGS_PATH = 'logs/3/'  # path to summary files
 # create logger (write to file and stdout):
 logger = ghelp.create_logger(filename=LOGS_PATH + 'training.log')
 
 logger.debug('Python version: \n    ' + sys.version + 
              '\n    Tensorflow version: ' + tf.__version__)
 
+
+# In[2]:
+
+
+################################################################################
+################################################################################
+
 # data path constants:
 # DATA_DIR = '../data/mnist/'
-DATA_DIR = 'data1/'
+DATA_DIR = 'data/'
 # DATA_DIR = '/usr/udo/data/'
-PREDICT_PATH = ''
-path_inference_graph = ['logs/inference_graphs/narihira2015/' +
-                        'tfmodel_inference.meta']
-# path_inference_graph = ['/Users/udodehm/Downloads/camp_depth_irolaina/' + '
-#                         'ResNet_pretrained/ResNet-L50.meta']
-# path_inference_graph = ['vgg16/vgg16.tfmodel']
-path_inference_graph = path_inference_graph[0]
+
+path_inference_graph_dict = {'narihira2015': 'models/narihira2015/' +
+                                             'tfmodel_inference.meta'}
+path_inference_graph = path_inference_graph_dict['narihira2015']
 logger.info('Path to infrence graph:\n    {}'.format(path_inference_graph))
 
-path_restore_model = None #'logs/2/tfmodel-5'
+path_restore_model = 'logs/2/tfmodel-84' #'logs/2/tfmodel-5' or None
 logger.info('Path to restored (already done some training) model\n' +
             '    (if available): {}'.format(path_restore_model))
+
+
+# In[3]:
+
+
+################################################################################
+################################################################################
 
 # hyper-parameters:
 m_height = 13  # multiplicate of image height size -> network is designed so 
     # that it can take images with shape of multiples of m
-m_width = m_height  # multiplicate of image width size -> network 
+m_width = m_height+19  # multiplicate of image width size -> network 
     # is designed so that it can take images with shape of multiples of m
 IMAGE_SHAPE = [32 * m_height, 32 * m_width, 3]  # complete image size 
     # [436, 1024, 3] # Narihira2015 use [M*32=13*32=416, 416, 3]
 logger.info('Trained on images of shape: {}'.format(IMAGE_SHAPE))
 
-INITIAL_LEARNING_RATE = 1e-5
+INITIAL_LEARNING_RATE = 5e-4
 logger.info('Initial learning rate: {}'.format(INITIAL_LEARNING_RATE))
 
 LOSS_TYPE = 'berhu'  # or 'mse'
@@ -104,7 +117,7 @@ BATCH_SIZE = 8  # nr of data which is put through the network before updating
     # careful with memory space)
 logger.info('Batch size: {}'.format(BATCH_SIZE))
 
-NUM_EPOCHS = 1  # nr of times the training process loops through the 
+NUM_EPOCHS = 2  # nr of times the training process loops through the 
     # complete training data set (how often is the tr set 'seen')
     # if you have 1000 training examples, and your batch size is 500, then it
     # will take 2 iterations to complete 1 epoch.
@@ -114,37 +127,18 @@ DISPLAY_STEP = 2  # every DIPLAY_STEP'th training iteration information is
     # printed (default: 100)
 logger.info('Report training set loss every {} iteration.'.format(DISPLAY_STEP))
 
-SUMMARY_STEP = 2  # every SUMMARY_STEP'th training iteration a summary file is 
-    # written to LOGS_PATH
-logger.info('Write summary for all summarized (except validation data ' +
-            'set summaries) to file every {}-th iteration.'.format(SUMMARY_STEP))
+SAVE_STEP = 2  # every SAVE_STEP'th training iteration a summary file is 
+    # written to LOGS_PATH and checkpoint files are saved
+logger.info('Write summary and checkpoints to file every ' +
+            '{}-th iteration.'.format(SAVE_STEP))
 DEVICE = '/cpu:0'  # device on which the variable is saved/processed
 logger.info('Device setting: {}'.format(DEVICE))
 
-
-# In[2]:
-
-
-# graph = tf.Graph()
-  
-# # Set the new graph as the default.
-# with graph.as_default():
-  
-#     # Open the graph-def file for binary reading.
-#     path = path_inference_graph
-#     with tf.gfile.FastGFile(path, 'rb') as file:
-#         # The graph-def is a saved copy of a TensorFlow graph.
-#         # First we need to create an empty graph-def.
-#         graph_def = tf.GraphDef()
-
-#         # Then we load the proto-buf file into the graph-def.
-#         graph_def.ParseFromString(file.read())
-
-#         # Finally we import the graph-def to the default TensorFlow graph.
-#         tf.import_graph_def(graph_def, name='')
+################################################################################
+################################################################################
 
 
-# In[3]:
+# In[4]:
 
 
 # load meta graph (inference graph)
@@ -156,21 +150,21 @@ saver_restore = tf.train.import_meta_graph(path_inference_graph,
 logger.debug('Restored inference graph.')
 
 
-# In[4]:
+# In[5]:
 
 
 # save default graph in variable:
 graph = tf.get_default_graph()
 
 
-# In[5]:
-
-
-# # plot imported inference graph:
-# plt_help.show_graph(graph.as_graph_def())
-
-
 # In[6]:
+
+
+# plot imported inference graph:
+plt_help.show_graph(graph.as_graph_def())
+
+
+# In[7]:
 
 
 # lets get the input
@@ -203,7 +197,7 @@ y_shading_pred = graph.get_tensor_by_name(name='deconv_s2out_shading/BiasAdd:0')
 #                                   name='0_1_clipping_shading')
 
 
-# In[7]:
+# In[8]:
 
 
 valid_mask = cnnhelp.get_valid_pixels(image=x, invalid_mask=invalid_px_mask)
@@ -229,7 +223,7 @@ with tf.name_scope('optimization'):
 logger.debug('Defined optimization method.')
 
 
-# In[8]:
+# In[9]:
 
 
 # to get every summary defined above we merge them to get one target:
@@ -242,7 +236,7 @@ summary_writer = tf.summary.FileWriter(LOGS_PATH)
 saver = tf.train.Saver(max_to_keep=NUM_EPOCHS)
 
 
-# In[9]:
+# In[10]:
 
 
 # introduce some validation set specific summaries
@@ -259,7 +253,7 @@ with tf.name_scope('loss/'):
 logger.debug('Defined validation loss')
 
 
-# In[10]:
+# In[11]:
 
 
 # # plot complete graph:
@@ -268,7 +262,7 @@ logger.debug('Finished building training graph.')
 logger.info('Total parameters of network: {}'.format(nnhelp.network_params()))
 
 
-# In[11]:
+# In[ ]:
 
 
 # import data:
@@ -278,9 +272,10 @@ df_train = pd.read_csv(DATA_DIR + file, sep=',', header=None,
                        names=['img', 'alb', 'shad', 'invalid'])
 # compolete image paths:
 df_train = DATA_DIR + df_train
-# enable this line to train on only one image (if enabled, do not forget
-# to set BATCH_SIZE = 1):
-# df_train = df_train.loc[[0]]
+# enable this line to train on only one image:
+df_train1 = df_train.loc[[0]]
+# replicate this row 100 times:
+df_train = pd.concat([df_train1]*100).reset_index(drop=True)
 # instantiate a data queue for feeding data in (mini) batches to cnn:
 data_train = iq.DataQueue(df=df_train, batch_size=BATCH_SIZE,
                           num_epochs=NUM_EPOCHS)
@@ -301,20 +296,8 @@ data_valid = iq.DataQueue(df=df_valid, batch_size=BATCH_SIZE,
                           num_epochs=NUM_EPOCHS)
 logger.debug('Imported validation data from\n    {}'.format(DATA_DIR + file))
 
-# # testing data set: 
-# file = 'sample_data_sintel_shading_test.csv'
-# df_test = pd.read_csv(DATA_DIR + file, sep=',', header=None,
-#                       names=['img', 'alb', 'shad', 'invalid'])
-# # compolete image paths:
-# df_test = DATA_DIR + df_test
-# # instantiate a data queue for feeding data in (mini) batches to cnn:
-# data_test = iq.DataQueue(df=df_test, batch_size=BATCH_SIZE,
-#                          num_epochs=1)
-# logger.debug('Imported testing data from\n    {}'.format(DATA_DIR + file))
 
-
-# In[12]:
-
+# In[ ]:
 
 
 ################################################################################
@@ -372,7 +355,8 @@ with tf.Session(config=config) as sess:
             # take a (mini) batch of the training data:
             deq_train = data_train.dequeue()
             img_b, alb_b, shad_b, inv_b = iq.next_batch(deq=deq_train, 
-                                                        shape=IMAGE_SHAPE, 
+                                                        output_shape=IMAGE_SHAPE,
+                                                        is_scale=True,
                                                         is_flip=True, 
                                                         is_rotated=True,
                                                         norm=True)
@@ -400,13 +384,13 @@ with tf.Session(config=config) as sess:
                              training: False}
                 train_loss = sess.run(loss, 
                                       feed_dict=feed_dict)
-                duration_time = time.time() - start_time
-                duration_time = ghelp.get_time_format(time_in_sec=duration_time)
-                duration_time = ghelp.time_tuple_to_str(time_tuple=duration_time)
+                dur_time = time.time() - start_time
+                dur_time = ghelp.get_time_format(time_in_sec=dur_time)
+                dur_time = ghelp.time_tuple_to_str(time_tuple=dur_time)
                 logger.info('iteration {}: '.format(data_train.num_iter) +
                             'training loss ' + 
                             '{tr_loss:.2f} (ET: '.format(tr_loss=train_loss) +
-                            '{}).'.format(duration_time))
+                            '{}).'.format(dur_time))
                 # reset timer to measure the displayed training steps:
                 start_time = time.time()
 
@@ -417,10 +401,6 @@ with tf.Session(config=config) as sess:
             # training steps => steps per epoch)
             val_epoch = int(data_train.df.shape[0] / data_train.batch_size)
             if data_train.num_iter % val_epoch == 0:
-                # save checkpoint files to disk:
-                save_path = saver.save(sess, LOGS_PATH + 'tfmodel',
-                                       global_step=data_train.num_iter)
-
                 # After each training epoch we will use the complete validation 
                 # data set to calculate the error/accuracy on the validation 
                 # set:
@@ -435,9 +415,10 @@ with tf.Session(config=config) as sess:
                     # normalization and dropout (training -> False).
                     # get validation data set (mini) batch:
                     lst = iq.next_batch(deq=data_valid.dequeue(), 
-                                        shape=IMAGE_SHAPE, 
-                                        is_flip=True,
-                                        is_rotated=True,
+                                        output_shape=IMAGE_SHAPE,
+                                        is_scale=False,
+                                        is_flip=False,
+                                        is_rotated=False,
                                         norm=True)
                     img_b_val, alb_b_val, shad_b_val, inv_b_val = lst
                     
@@ -454,26 +435,28 @@ with tf.Session(config=config) as sess:
                 # adding a mean loss summary op (for tensorboard). 
                 # we need to divide the accumulated loss from above by the 
                 # iteration steps (steps_per_epoch):
-                feed_dict = {valid_loss: validation_loss / valid_steps_per_epoch}
+                feed_dict = {valid_loss: validation_loss/valid_steps_per_epoch}
                 validation_loss_total = sess.run(valid_loss_summary, 
                                                  feed_dict=feed_dict)
                 summary_writer.add_summary(summary=validation_loss_total, 
                                            global_step=data_train.num_iter)
-                duration_time = time.time() - start_time
-                duration_time = ghelp.get_time_format(time_in_sec=duration_time)
-                duration_time = ghelp.time_tuple_to_str(time_tuple=duration_time)
+                dur_time = time.time() - start_time
+                dur_time = ghelp.get_time_format(time_in_sec=dur_time)
+                dur_time = ghelp.time_tuple_to_str(time_tuple=dur_time)
                 logger.info('Validation scores after epoch ' + 
                             '{} '.format(data_train.completed_epochs + 1) + 
-                            '(step {}):\n'.format(data_train.num_iter) +
-                            '    Model saved in file: {}.\n'.format(save_path) +
+                            '(iteration {}):\n'.format(data_train.num_iter) +
                             '    # validation data: ' +
                             '{}, mean loss: '.format(data_valid.df.shape[0]) +
-                            '{ml:.2f}'.format(ml=validation_loss / valid_steps_per_epoch) +
-                            ' (ET: {}).'.format(duration_time))
+                            '{:.2f}'.format(validation_loss/valid_steps_per_epoch)+
+                            ' (ET: {}).'.format(dur_time))
                 # reset timer to measure the displayed training steps:
                 start_time = time.time()
 
-            if data_train.num_iter % SUMMARY_STEP == 0:
+            if data_train.num_iter % SAVE_STEP == 0:
+                # save checkpoint files to disk:
+                save_path = saver.save(sess, LOGS_PATH + 'tfmodel',
+                                       global_step=data_train.num_iter)
                 feed_dict = {x: img_b,  
                              y_albedo_label: alb_b,
                              y_shading_label: shad_b,
@@ -486,6 +469,17 @@ with tf.Session(config=config) as sess:
                 #     corresponding summary parameter.)
                 summary_writer.add_summary(summary=s, 
                                            global_step=data_train.num_iter)
+                dur_time = time.time() - start_time
+                dur_time = ghelp.get_time_format(time_in_sec=dur_time)
+                dur_time = ghelp.time_tuple_to_str(time_tuple=dur_time)
+                logger.info('Saved data (iteration ' + 
+                            '{}):\n'.format(data_train.num_iter) +
+                            '    Checkpoint file written to: ' + 
+                            '{} '.format(save_path) +
+                            '(ET: {}).'.format(dur_time))
+                # reset timer to measure the displayed training steps:
+                start_time = time.time()
+
         # end while loop when there are no elements left to dequeue:
         except IndexError:
             end_total_time = time.time() - start_total_time
@@ -494,5 +488,12 @@ with tf.Session(config=config) as sess:
             logger.info('Training done... total training time: ' + 
                         '{}.'.format(end_total_time))
             break
+
 logger.info('Finished training.')
+
+
+# In[ ]:
+
+
+# !tensorboard --logdir /logs/1
 
