@@ -349,6 +349,12 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
         loss_shading = mse_reg(label=label_shading,
                                prediction=prediction_shading, lambda_=lambda_,
                                valid_mask=valid_mask, log=log)
+        if lambda_==0:
+            lambda_str = 'l2'
+        elif lambda_==1:
+            lambda_str = 'l2_invariant'
+        elif lambda_==0.5:
+            lambda_str = 'l2_avg'
     elif loss_type == 'berhu':
         loss_albedo = berhu_loss(label=label_albedo,
                                  prediction=prediction_albedo,
@@ -356,6 +362,7 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
         loss_shading = berhu_loss(label=label_shading,
                                   prediction=prediction_shading,
                                   valid_mask=valid_mask, log=log)
+        lambda_str = loss_type
     else:
         raise TypeError("Enter valid loss_type ('mse', 'berhu').")
 
@@ -367,6 +374,6 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
     # of them) etc (tf.summary.scalar())
     # (have a look at parameters that change over time (= training
     # steps))
-    tf.summary.scalar(name='loss', tensor=loss)
+    tf.summary.scalar(name='loss_' + lambda_str, tensor=loss)
     return loss
 
