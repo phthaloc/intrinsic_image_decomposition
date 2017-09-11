@@ -25,7 +25,7 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
 
-__all__ = ['model_narihira2015']   
+__all__ = ['model_narihira2015', 'create_inference_graph']   
 
 
 def model_narihira2015(inputs,
@@ -344,7 +344,7 @@ def model_narihira2015(inputs,
     return deconv_s2_albedo, deconv_s2_shading
 
 
-def create_inference_graph(save_path, device='/cpu:0'):
+def create_inference_graph(modelfunc, save_path, device='/cpu:0'):
     """
     Create an inference graph (defined above): A complete neural network that
     (ONLY) can do inference (forward pass). 
@@ -391,7 +391,7 @@ def create_inference_graph(save_path, device='/cpu:0'):
     training = tf.placeholder(tf.bool, name='is_training')
 
     # define model in a separate function:
-    model_out = model_narihira2015(inputs=x, training=training, device=device)
+    model_out = modelfunc(inputs=x, training=training, device=device)
 
     # to get every summary defined above we merge them to get one target:
     merge_train_summaries = tf.summary.merge_all()
@@ -428,6 +428,7 @@ def create_inference_graph(save_path, device='/cpu:0'):
 
 
 if __name__ == "__main__":
-    create_inference_graph(save_path='models/narihira2015/',
-                           device='/gpu:0')
+    create_inference_graph(modelfunc=model_narihira2015, 
+                           save_path='models/narihira2015/',
+                           device='/cpu:0')
 
