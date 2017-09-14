@@ -343,6 +343,11 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
         of label and prediction) (default: True)
     :type log: boolean
     """
+    if log:
+        logstr = '_log'
+    else:
+        logstr = ''
+
     if loss_type == 'mse':
         loss_albedo = mse_reg(label=label_albedo, prediction=prediction_albedo,
                               lambda_=lambda_, valid_mask=valid_mask, log=log)
@@ -350,11 +355,12 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
                                prediction=prediction_shading, lambda_=lambda_,
                                valid_mask=valid_mask, log=log)
         if lambda_==0:
-            lambda_str = 'l2'
+            lambda_str = 'l2_log' + logstr
         elif lambda_==1:
-            lambda_str = 'l2_invariant'
+            lambda_str = 'l2_invariant' + logstr
         elif lambda_==0.5:
-            lambda_str = 'l2_avg'
+            lambda_str = 'l2_avg' + logstr
+
     elif loss_type == 'berhu':
         loss_albedo = berhu_loss(label=label_albedo,
                                  prediction=prediction_albedo,
@@ -362,7 +368,7 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
         loss_shading = berhu_loss(label=label_shading,
                                   prediction=prediction_shading,
                                   valid_mask=valid_mask, log=log)
-        lambda_str = loss_type
+        lambda_str = loss_type + logstr
     else:
         raise TypeError("Enter valid loss_type ('mse', 'berhu').")
 
