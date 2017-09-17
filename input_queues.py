@@ -642,6 +642,9 @@ def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
     :type is_rotated: bool (default: True)
     :param norm: norm images to [0, 1] range.
     :type norm: boolean (default: True)
+    :param log: PARAMETER DELETED: flag, if true applies natural logarithm to
+        each pixel. Only use log=True if norm=False (default: False)
+    :type log: bool
     :return: batch of images, albedo labels and shading labels
     ATTENTION: image rotation (function sp.ndimage.interpolation.rotate() and
         underlying function sp.ndimage._nd_image.geometric_transform() take
@@ -685,11 +688,30 @@ def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
         # preprocess images (randomly flip horizontally, rotate and/or crop):
         if is_flip:
             imgs_stacked = image_random_flip(image=imgs_stacked)
+
         if is_rotated:
             imgs_stacked = image_random_rotate(image=imgs_stacked)
+
         if output_shape:
             imgs_stacked = image_random_crop(image=imgs_stacked,
                                              output_shape=output_shape)
+
+#         if not norm and log:
+#             # set an offset so that log(0)==-inf can not occure:
+#             offset = 0.5
+#             # natural logarithm (base e):
+#             # evtl. take abs value to ensure that there will be no log(-x):
+#             imgs_stacked = np.where(imgs_stacked>0,
+#                                     np.log(imgs_stacked),
+#                                     np.log(imgs_stacked+offset))
+#         elif norm and not log:
+#             imgs_stacked = image_normalize(image=imgs_stacked)
+#         elif norm and log:
+#             raise ValueError('It does not make sense to scale logarithmic ' +
+#                              'image pixels to range [0, 1] because then one ' +
+#                              'has negative pixel values (log((0, 1])<0). ' +
+#                              'If you want to use logarithmic pixels ' +
+#                              '(log=True) set norm=False.')
         if norm:
             imgs_stacked = image_normalize(image=imgs_stacked)
         # split images to get [image, albedo, shading]:
@@ -697,6 +719,7 @@ def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
         imgs_splitted = np.split(ary=imgs_stacked,
                                  indices_or_sections=split_points,
                                  axis=2)
+
         for i, col in enumerate(deq):
             batches[i].append(imgs_splitted[i])
     return (np.stack(batch) for batch in batches)

@@ -29,7 +29,6 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow.contrib import slim
-get_ipython().magic('matplotlib inline')
 import matplotlib.pyplot as plt
 import input_queues as iq
 import cnn_model
@@ -49,7 +48,7 @@ __maintainer__ = "Udo Dehm"
 __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
-__all__ = ['train_network']  
+__all__ = ['train_network']
 
 
 # make only 'gpu:0' visible, so that only one gpu is used not both, see also
@@ -58,11 +57,11 @@ __all__ = ['train_network']
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
-def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
+def train_network(log_dir, data_dir, path_inference_graph, checkpoint_path,
                   restore_scope, image_shape, initial_learning_rate, loss_opt, 
                   batch_size, num_epochs, display_step, save_step, 
-                  nodes_name_dict, norm=False, plot_inference_graph=False,
-                  is_sample_size=False):
+                  nodes_name_dict, norm=False, 
+                  plot_inference_graph=False, is_sample_size=False):
     """
     :param log_dir: path to directory for saving summary/log files
     :type log_dir: str
@@ -73,9 +72,9 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
     :param path_inference_graph: path to inference graph (graph without 
         'training' ops)
     :type path_inference_graph: str
-    :param path_restore_model: path to model parameters (checkpoint files
+    :param checkpoint_path: path to model parameters (checkpoint files
         e.g. 'logs/2/tfmodel-5' or None)
-    :type path_restore_model: str
+    :type checkpoint_path: str
     :param restore_scope: a scope name which has to be defined to find 
         parameters to restore (e.g. 'vgg_16'). Usually this is needed to
         find a pre-trained (tf slim) model within another model.
@@ -85,9 +84,8 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
     :type image_shape: list with len(image_shape)==3
     :param initial_learning_rate: hyper-parameters for initial learning rate
     :type initial_learning_rate: float
-    :param loss_opt: loss function used for optimization ('berhu_log', 
-        'berhu', 'l2_log', 'l2', 'l2_inv_log', 'l2_inv', 'l2_avg_log', 
-        'l2_avg')
+    :param loss_opt: loss function used for optimization 
+        ('berhu', 'l2', 'l2_inv', 'l2_avg')
     :type loss_opt: str
     :param batch_size: nr of data which is put through the network before 
         updating it, as default use: 16, 32 or 64. 
@@ -127,14 +125,14 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
     logger.debug('Python version: \n    ' + sys.version + 
                  '\n    Tensorflow version: ' + tf.__version__)
     logger.info('Training on images of shape: {}'.format(image_shape))
+    logger.info('Training on [0, 1] normalized pixel values: {}'.format(norm))
     logger.info('Initial learning rate: {}'.format(initial_learning_rate))
     logger.info('Loss function used for optimization: {}'.format(loss_opt))
     logger.info('Batch size: {}'.format(batch_size))
     logger.info('# epochs: {}'.format(num_epochs))
-    logger.info('Report training set loss every {}'.format(display_step) +
-                'iteration.')
-    logger.info('Write summary and checkpoints to file every ' +
-                '{}-th iteration.'.format(save_step))
+    logger.info('Write summary and checkpoints to file (in directory ' +
+                '{}) every '.format(log_dir) +
+                '{} iterations.'.format(save_step))
 
     # load meta graph (inference graph)
     # how to work with restored models:
@@ -207,33 +205,34 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
              'prediction_shading': y_shading_pred,
              'valid_mask': valid_mask}
         
-        loss_dict = {'berhu_log': chlp.loss_fct(**d, **{'loss_type': 'berhu',
-                                                        'lambda_': None, 
-                                                        'log': True}),
-                     'berhu': chlp.loss_fct(**d, **{'loss_type': 'berhu', 
-                                                    'lambda_': None, 
-                                                    'log': False}),
-                     'l2_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
-                                                     'lambda_': 0, 
-                                                     'log': True}),
+        loss_dict = {'berhu': chlp.loss_fct(**d, **{'loss_type': 'berhu', 
+                                                    'lambda_': None}),
+#                      'berhu_log': chlp.loss_fct(**d, **{'loss_type': 'berhu',
+#                                                         'lambda_': None, 
+#                                                         'log': True}),
+#                      'l2_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+#                                                      'lambda_': 0, 
+#                                                      'log': True}),
                      'l2': chlp.loss_fct(**d, **{'loss_type': 'mse', 
-                                                 'lambda_': 0, 
-                                                 'log': False}),
-                     'l2_inv_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
-                                                         'lambda_': 1, 
-                                                         'log': True}),
+                                                 'lambda_': 0}),
+#                      'l2_inv_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+#                                                          'lambda_': 1, 
+#                                                          'log': True}),
                      'l2_inv': chlp.loss_fct(**d, **{'loss_type': 'mse',
-                                                     'lambda_': 1,
-                                                     'log': False}),
-                     'l2_avg_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
-                                                         'lambda_': 0.5,
-                                                         'log': True}),
+                                                     'lambda_': 1}),
+#                      'l2_avg_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+#                                                          'lambda_': 0.5,
+#                                                          'log': True}),
                      'l2_avg': chlp.loss_fct(**d, **{'loss_type': 'mse',
-                                                     'lambda_': 0.5, 
-                                                     'log': False})
+                                                     'lambda_': 0.5})
                     }
+        if loss_opt not in ('berhu', 'l2', 'l2_inv', 'l2_avg'):
+            raise ValueError('{} is not a valid loss '.format(loss_opt) + 
+                             'function. Set parameter loss_opt to one of the ' +
+                             "following: ('berhu', 'l2', 'l2_inv', 'l2_avg')")
+
         loss = loss_dict[loss_opt]
-    logger.debug('Defined losses.')
+    logger.debug('Defined training losses.')
 
     ############################################################################
 
@@ -335,20 +334,20 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
         # initialize all variables:
         sess.run([init_global, init_local])
 
-        if path_restore_model:
+        if checkpoint_path:
             try:
                 # restore saved model parameters (weights, biases, etc):
-                saver_restore.restore(sess, path_restore_model)
+                saver_restore.restore(sess, checkpoint_path)
                 logger.info('Restoring parameters from ' +
-                            '{}'.format(path_restore_model))
+                            '{}'.format(checkpoint_path))
             except (tf.errors.InvalidArgumentError, tf.errors.NotFoundError):
                 # in the worst case parameters are loaded twice.
                 # restore the parameters:
-                init_fn = slim.assign_from_checkpoint_fn(path_restore_model,
+                init_fn = slim.assign_from_checkpoint_fn(checkpoint_path,
                                                          variables_to_restore)
                 init_fn(sess)
                 logger.info('Restoring parameters from ' +
-                            '{}'.format(path_restore_model))
+                            '{}'.format(checkpoint_path))
 
         # Adds a Graph to the event file.
         # create summary that give output (TensorFlow op that output protocol 
@@ -421,7 +420,7 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
                                 ', '.join(['{}: {:.4f}'.format(it[0], it[1]) \
                                            for it in train_loss_dict.items() \
                                            if it[0]!=loss_opt]) +
-                                ' , ET: {}).'.format(dur_time))
+                                ', ET: {}).'.format(dur_time))
                     # reset timer to measure the displayed training steps:
                     start_time = time.time()
 
@@ -528,7 +527,7 @@ def train_network(log_dir, data_dir, path_inference_graph, path_restore_model,
     logger.info('Finished training.')
 
 
-# In[ ]:
+# In[2]:
 
 
 m_height = 13  # multiplicate of image height size -> network is designed so 
@@ -545,7 +544,7 @@ m_width = m_height  # multiplicate of image width size -> network
 # params = {'log_dir': 'logs/narihira2015/test',  # path to summary files
 #           'data_dir': '/usr/udo/data/',
 #           'path_inference_graph': 'models/narihira2015/tfmodel_inference.meta',
-#           'path_restore_model': None, # e.g. 'logs/2/tfmodel-5' or None
+#           'checkpoint_path': None, # e.g. 'logs/2/tfmodel-5' or None
 #           'restore_scope': None,
 #           'image_shape': [32 * m_height, 32 * m_width, 3],
 #           'initial_learning_rate': 5e-4,  # hyper param
@@ -572,10 +571,10 @@ print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
 download.maybe_download_and_extract(url=url, 
                                     download_dir=checkpoints_dir,
                                     print_download_progress=True)
-params = {'log_dir': 'logs/slim_vgg16_narihira2015/test/',
+params = {'log_dir': 'logs/slim_vgg16_narihira2015/norm_berhu/1/',
           'data_dir': '/usr/udo/data/',
           'path_inference_graph': 'models/slim/graphs/vgg16_narihira2015/tfmodel_inference.meta',
-          'path_restore_model': 'models/slim/checkpoints/vgg_16.ckpt',
+          'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
           'restore_scope': 'vgg_16',
           'image_shape': [32 * m_height, 32 * m_width, 3],
           'initial_learning_rate': 5e-4,  # hyper param
@@ -585,13 +584,13 @@ params = {'log_dir': 'logs/slim_vgg16_narihira2015/test/',
           'display_step': 20,
           'save_step': 100,
           'nodes_name_dict': nodes_name_dict,
-          'norm': False,
+          'norm': True,
           'plot_inference_graph': False,
           'is_sample_size': False
          }
 
 
-# In[ ]:
+# In[3]:
 
 
 train_network(**params)

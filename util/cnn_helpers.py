@@ -231,7 +231,7 @@ def get_valid_pixels(image, invalid_mask=None):
     return valid
 
 
-def berhu_loss(label, prediction, valid_mask=None, log=True):
+def berhu_loss(label, prediction, valid_mask=None):
     """
     :param label: ground truth label image
     :type label: np.array or tf tensor RGB image
@@ -240,17 +240,17 @@ def berhu_loss(label, prediction, valid_mask=None, log=True):
     :param valid_mask: binary map with 0 for invalid pixels that are not
         considered calculating the loss and 1 for valid pixels (default: None)
     :type valid_mask: np.array or tf tensor image
-    :param log: calculate loss in log space (take elementwise natural log
-        of label and prediction) (default: True)
+    :param log: PARAMETER DELETED calculate loss in log space (take elementwise
+        natural log of label and prediction) (default: True)
     :type log: bool
     """
-    if log:
-        # define offset to ensure that there will be no log(0)=-inf:
-        offset = 0.5
-        # natural logarithm (base e):
-        # take abs value to ensure that there will be no log(-x):
-        label = tf.log(tf.abs(label) + offset)
-        prediction = tf.log(tf.abs(prediction) + offset)
+#     if log:
+#         # define offset to ensure that there will be no log(0)=-inf:
+#         offset = 0.5
+#         # natural logarithm (base e):
+#         # take abs value to ensure that there will be no log(-x):
+#         label = tf.log(tf.abs(label) + offset)
+#         prediction = tf.log(tf.abs(prediction) + offset)
 
     # Calculate absolute difference between prediction and label:
     diff = tf.abs(prediction - label)
@@ -274,7 +274,7 @@ def berhu_loss(label, prediction, valid_mask=None, log=True):
     return berhu_loss
 
 
-def mse_reg(label, prediction, lambda_, valid_mask=None, log=True):
+def mse_reg(label, prediction, lambda_, valid_mask=None):
     """
     Computes loss function (it compares ground truth (labels) to predictions
     y)
@@ -288,20 +288,20 @@ def mse_reg(label, prediction, lambda_, valid_mask=None, log=True):
     :param valid_mask: binary map with 0 for invalid pixels that are not
         considered calculating the loss and 1 for valid pixels (default: None)
     :type valid_mask: np.array or tf tensor image
-    :param log: calculate loss in log space (take elementwise natural log
-        of label and prediction) (default: True)
+    :param log: PARAMETER DELETED calculate loss in log space (take elementwise
+        natural log of label and prediction) (default: True)
     :type log: boolean
 
     """
-    if log:
-        # define offset to ensure that there will be no log(0)=-inf:
-        offset = 0.5
-        # natural logarithm (base e):
-        # take abs value to ensure that there will be no log(-x):
-        label = tf.log(tf.abs(label) + offset)
-        prediction = tf.log(tf.abs(prediction) + offset)
+#     if log:
+#         # define offset to ensure that there will be no log(0)=-inf:
+#         offset = 0.5
+#         # natural logarithm (base e):
+#         # take abs value to ensure that there will be no log(-x):
+#         label = tf.log1p(tf.abs(label) + offset)
+#         prediction = tf.log1p(tf.abs(prediction) + offset)
 
-    diff = prediction - label
+    diff = tf.abs(prediction - label)
 
     if valid_mask is not None:
         # get rid of invalid pixels (which do not contribute to loss):
@@ -318,7 +318,7 @@ def mse_reg(label, prediction, lambda_, valid_mask=None, log=True):
 
 
 def loss_fct(label_albedo, label_shading, prediction_albedo,
-             prediction_shading, lambda_, loss_type, valid_mask=None, log=True):
+             prediction_shading, lambda_, loss_type, valid_mask=None):
     """
     Computes loss function (it compares ground truth (labels) to predictions
     y)
@@ -339,36 +339,36 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
     :param valid_mask: binary map with 0 for invalid pixels that are not
         considered calculating the loss and 1 for valid pixels (default: None)
     :type valid_mask: np.array or tf tensor image
-    :param log: calculate loss in log space (take elementwise natural log
-        of label and prediction) (default: True)
+    :param log: PARAMETER DELETED calculate loss in log space (take elementwise
+        natural log of label and prediction) (default: True)
     :type log: boolean
     """
-    if log:
-        logstr = '_log'
-    else:
-        logstr = ''
+#     if log:
+#        logstr = '_log'
+#     else:
+#         logstr = ''
 
     if loss_type == 'mse':
         loss_albedo = mse_reg(label=label_albedo, prediction=prediction_albedo,
-                              lambda_=lambda_, valid_mask=valid_mask, log=log)
+                              lambda_=lambda_, valid_mask=valid_mask)
         loss_shading = mse_reg(label=label_shading,
                                prediction=prediction_shading, lambda_=lambda_,
-                               valid_mask=valid_mask, log=log)
+                               valid_mask=valid_mask)
         if lambda_==0:
-            lambda_str = 'l2_log' + logstr
+            lambda_str = 'l2'  # + logstr
         elif lambda_==1:
-            lambda_str = 'l2_invariant' + logstr
+            lambda_str = 'l2_invariant'  # + logstr
         elif lambda_==0.5:
-            lambda_str = 'l2_avg' + logstr
+            lambda_str = 'l2_avg'  # + logstr
 
     elif loss_type == 'berhu':
         loss_albedo = berhu_loss(label=label_albedo,
                                  prediction=prediction_albedo,
-                                 valid_mask=valid_mask, log=log)
+                                 valid_mask=valid_mask)
         loss_shading = berhu_loss(label=label_shading,
                                   prediction=prediction_shading,
-                                  valid_mask=valid_mask, log=log)
-        lambda_str = loss_type + logstr
+                                  valid_mask=valid_mask)
+        lambda_str = loss_type  # + logstr
     else:
         raise TypeError("Enter valid loss_type ('mse', 'berhu').")
 
@@ -380,6 +380,7 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
     # of them) etc (tf.summary.scalar())
     # (have a look at parameters that change over time (= training
     # steps))
-    tf.summary.scalar(name='loss_' + lambda_str, tensor=loss)
+    tf.summary.scalar(name='loss_', # + lambda_str,
+                      tensor=loss)
     return loss
 
