@@ -722,5 +722,5 @@ def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
 
         for i, col in enumerate(deq):
             batches[i].append(imgs_splitted[i])
-    return (np.stack(batch) for batch in batches)
+    return list(np.stack(batch) for batch in batches)
 
