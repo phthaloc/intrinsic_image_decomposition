@@ -17,7 +17,7 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
 
-__all__ = ['conv2d_layer', 'get_valid_pixels', 'berhu_loss', 'mse_reg',
+__all__ = ['conv2d_layer', 'get_valid_pixels', 'berhu_loss', 'l2_loss',
            'loss_fct']
 
 
@@ -274,7 +274,7 @@ def berhu_loss(label, prediction, valid_mask=None):
     return berhu_loss
 
 
-def mse_reg(label, prediction, lambda_, valid_mask=None):
+def l2_loss(label, prediction, lambda_, valid_mask=None):
     """
     Computes loss function (it compares ground truth (labels) to predictions
     y)
@@ -317,6 +317,32 @@ def mse_reg(label, prediction, lambda_, valid_mask=None):
     return mse - lambda_ * reduced
 
 
+def l1_loss(label, prediction, valid_mask=None):
+    """
+    Computes L1 loss function (it compares ground truth (labels) to predictions
+    y)
+    :param label: ground truth label image
+    :type label: np.array or tf tensor RGB image
+    :param prediction: prediction (network output) of label image
+    :type prediction: np.array or tf tensor RGB image
+    :param valid_mask: binary map with 0 for invalid pixels that are not
+        considered calculating the loss and 1 for valid pixels (default: None)
+    :type valid_mask: np.array or tf tensor image
+    """
+    diff = tf.abs(prediction - label)
+
+    if valid_mask is not None:
+        # get rid of invalid pixels (which do not contribute to loss):
+        diff_valid = tf.multiply(valid_mask, diff)
+        # count number of valid pixels (needed to get mean loss later):
+        n_valid = tf.reduce_sum(valid_mask)
+        loss = tf.reduce_sum(diff_valid) / n_valid
+    else:
+        loss = tf.reduce_mean(diff)
+
+    return loss 
+
+
 def loss_fct(label_albedo, label_shading, prediction_albedo,
              prediction_shading, lambda_, loss_type, valid_mask=None):
     """
@@ -334,7 +360,7 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
     :param lambda_: regularizer (least square loss if lambda_ = 0, scale
         invariant loss if lambda_ = 1, average of both if lambda_ = 0.5)
     :type lambda_: float (elemm [0, 1])
-    :param loss_type: elem {'mse', 'berhu'}
+    :param loss_type: elem {'l1', 'l2', 'berhu'}
     :type loss_type: str
     :param valid_mask: binary map with 0 for invalid pixels that are not
         considered calculating the loss and 1 for valid pixels (default: None)
@@ -348,18 +374,26 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
 #     else:
 #         logstr = ''
 
-    if loss_type == 'mse':
-        loss_albedo = mse_reg(label=label_albedo, prediction=prediction_albedo,
+    if loss_type == 'l2':
+        loss_albedo = l2_loss(label=label_albedo, prediction=prediction_albedo,
                               lambda_=lambda_, valid_mask=valid_mask)
-        loss_shading = mse_reg(label=label_shading,
+        loss_shading = l2_loss(label=label_shading,
                                prediction=prediction_shading, lambda_=lambda_,
                                valid_mask=valid_mask)
         if lambda_==0:
-            lambda_str = 'l2'  # + logstr
+            lambda_str = loss_type  # + logstr
         elif lambda_==1:
-            lambda_str = 'l2_invariant'  # + logstr
+            lambda_str = loss_type + '_invariant'  # + logstr
         elif lambda_==0.5:
-            lambda_str = 'l2_avg'  # + logstr
+            lambda_str = loss_type + '_avg'  # + logstr
+    elif loss_type == 'l1':
+        loss_albedo = l1_loss(label=label_albedo,
+                              prediction=prediction_albedo,
+                              valid_mask=valid_mask)
+        loss_shading = l1_loss(label=label_shading,
+                               prediction=prediction_shading,
+                               valid_mask=valid_mask)
+        lambda_str = loss_type
 
     elif loss_type == 'berhu':
         loss_albedo = berhu_loss(label=label_albedo,
@@ -370,7 +404,7 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
                                   valid_mask=valid_mask)
         lambda_str = loss_type  # + logstr
     else:
-        raise TypeError("Enter valid loss_type ('mse', 'berhu').")
+        raise TypeError("Enter valid loss_type ('l1', 'l2', 'berhu').")
 
     loss = loss_albedo + loss_shading
     # create summaries that give outputs (TensorFlow ops that output
