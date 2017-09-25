@@ -55,7 +55,7 @@ __all__ = ['train_network']
 # https://github.com/tensorflow/tensorflow/issues/5066
 # https://github.com/tensorflow/tensorflow/issues/3644#issuecomment-237631171
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 def train_network(log_dir, data_dir, path_inference_graph, checkpoint_path,
                   restore_scope, image_shape, initial_learning_rate, loss_opt, 
@@ -174,6 +174,7 @@ def train_network(log_dir, data_dir, path_inference_graph, checkpoint_path,
         # try importing training node (is needed for models that use batch 
         # normalization etc.)
         training = graph.get_tensor_by_name(name='is_training:0')
+        logger.debug('Was able to catch is_training node!')
     except KeyError:
         # elsewise just define a placeholder wich is used as dummy variable
         # and won't be used later:
@@ -210,26 +211,28 @@ def train_network(log_dir, data_dir, path_inference_graph, checkpoint_path,
 #                      'berhu_log': chlp.loss_fct(**d, **{'loss_type': 'berhu',
 #                                                         'lambda_': None, 
 #                                                         'log': True}),
-#                      'l2_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+#                      'l2_log': chlp.loss_fct(**d, **{'loss_type': 'l2', 
 #                                                      'lambda_': 0, 
 #                                                      'log': True}),
-                     'l2': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+                     'l1': chlp.loss_fct(**d, **{'loss_type': 'l1',
+                                                 'lambda_': None}),
+                     'l2': chlp.loss_fct(**d, **{'loss_type': 'l2', 
                                                  'lambda_': 0}),
-#                      'l2_inv_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+#                      'l2_inv_log': chlp.loss_fct(**d, **{'loss_type': 'l2', 
 #                                                          'lambda_': 1, 
 #                                                          'log': True}),
-                     'l2_inv': chlp.loss_fct(**d, **{'loss_type': 'mse',
+                     'l2_inv': chlp.loss_fct(**d, **{'loss_type': 'l2',
                                                      'lambda_': 1}),
-#                      'l2_avg_log': chlp.loss_fct(**d, **{'loss_type': 'mse', 
+#                      'l2_avg_log': chlp.loss_fct(**d, **{'loss_type': 'l2', 
 #                                                          'lambda_': 0.5,
 #                                                          'log': True}),
-                     'l2_avg': chlp.loss_fct(**d, **{'loss_type': 'mse',
+                     'l2_avg': chlp.loss_fct(**d, **{'loss_type': 'l2',
                                                      'lambda_': 0.5})
                     }
-        if loss_opt not in ('berhu', 'l2', 'l2_inv', 'l2_avg'):
+        if loss_opt not in ('berhu', 'l1', 'l2', 'l2_inv', 'l2_avg'):
             raise ValueError('{} is not a valid loss '.format(loss_opt) + 
                              'function. Set parameter loss_opt to one of the ' +
-                             "following: ('berhu', 'l2', 'l2_inv', 'l2_avg')")
+                             "following: ('berhu', 'l1', 'l2', 'l2_inv', 'l2_avg')")
 
         loss = loss_dict[loss_opt]
     logger.debug('Defined training losses.')
@@ -238,10 +241,44 @@ def train_network(log_dir, data_dir, path_inference_graph, checkpoint_path,
 
     # Use an AdamOptimizer to train the network:
     with tf.name_scope('optimization'):
-        opt_step = tf.train.AdamOptimizer(initial_learning_rate).minimize(loss)
-    logger.debug('Defined optimization method.')
+        optimizer = tf.train.AdamOptimizer(learning_rate=initial_learning_rate)
+        
+        # use slim optimizaton op only if a batch normalization is in the 
+        # tf graph.
+        use_slim_train_opt = False
+        for v in graph.as_graph_def().node:
+            if 'batchnorm' in v.name.lower():
+                use_slim_train_opt = True
+                break
+        # Many networks utilize modules, like BatchNorm, that require 
+        # performing a series of non-gradient updates during training. 
+        # slim.learning.create_train_op allows a user to pass in a list of 
+        # update_ops to call along with the gradient updates.
+        #   train_op = slim.learning.create_train_op(total_loss, optimizer,
+        #                                            update_ops)
+        # By default, slim.learning.create_train_op includes all update ops 
+        # that are part of the `tf.GraphKeys.UPDATE_OPS` collection. 
+        # Additionally, TF-Slim's slim.batch_norm function adds the moving mean
+        # and moving variance updates to this collection. Consequently, users 
+        # who want to use slim.batch_norm will not need to take any additional
+        # steps in order to have the moving mean and moving variance updates be
+        # computed.
+        # (see https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/slim/python/slim/learning.py)
+        if use_slim_train_opt:
+            opt_step = slim.learning.create_train_op(total_loss=loss, 
+                                                     optimizer=optimizer) 
+            logger.debug('Using slim optimizaton op because a batch ' +
+                         'normalization is apparently in the tf graph.')
+        else:
+            opt_step = optimizer.minimize(loss)
+            logger.debug('Using default tf optimizaton op because there is ' +
+                         'apparently no batch normalization in the tf ' +
+                         'graph.')
 
-    ###########################################################################
+    logger.debug('Defined optimization method.')
+    
+    
+    ############################################################################
 
     # to get every summary defined above we merge them to get one target:
     merge_train_summaries = tf.summary.merge_all()
@@ -527,7 +564,7 @@ def train_network(log_dir, data_dir, path_inference_graph, checkpoint_path,
     logger.info('Finished training.')
 
 
-# In[2]:
+# In[ ]:
 
 
 m_height = 13  # multiplicate of image height size -> network is designed so 
@@ -560,37 +597,66 @@ m_width = m_height  # multiplicate of image width size -> network
 #          }
 
 
-# slim_vgg16_narihira2015:
+# # slim_vgg16_narihira2015:
+# nodes_name_dict = {'input': 'input:0',
+#                    'output_albedo': 'scale2/deconv6_s2_albedo/BiasAdd:0',
+#                    'output_shading': 'scale2/deconv6_s2_shading/BiasAdd:0'}
+# # download checkpoint files:
+# url = "http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz"
+# checkpoints_dir = './models/slim/checkpoints'
+# print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
+# download.maybe_download_and_extract(url=url, 
+#                                     download_dir=checkpoints_dir,
+#                                     print_download_progress=True)
+# params = {'log_dir': 'logs/slim_vgg16_narihira2015/test/',
+#           'data_dir': '/usr/udo/data/',
+#           'path_inference_graph': 'models/slim/graphs/vgg16_narihira2015/tfmodel_inference.meta',
+#           'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
+#           'restore_scope': 'vgg_16',
+#           'image_shape': [32 * m_height, 32 * m_width, 3],
+#           'initial_learning_rate': 5e-4,  # hyper param
+#           'loss_opt': 'l1',
+#           'batch_size': 4,  # hyper param
+#           'num_epochs': 2,  # hyper param 
+#           'display_step': 2,
+#           'save_step': 6,
+#           'nodes_name_dict': nodes_name_dict,
+#           'norm': True,
+#           'plot_inference_graph': False,
+#           'is_sample_size': False
+#          }
+
+# slim_resnet_v1_50_deconv_decoder:
 nodes_name_dict = {'input': 'input:0',
-                   'output_albedo': 'scale2/deconv6_s2_albedo/BiasAdd:0',
-                   'output_shading': 'scale2/deconv6_s2_shading/BiasAdd:0'}
+                   'output_albedo': 'decoder/deconv7_albedo/BiasAdd:0',
+                   'output_shading': 'decoder/deconv7_shading/BiasAdd:0'}
 # download checkpoint files:
-url = "http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz"
+url = "http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz"
 checkpoints_dir = './models/slim/checkpoints'
-print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
+print('If not available download resnet_v1_50 ckpt files to ' + checkpoints_dir)
 download.maybe_download_and_extract(url=url, 
                                     download_dir=checkpoints_dir,
                                     print_download_progress=True)
-params = {'log_dir': 'logs/slim_vgg16_narihira2015/norm_berhu/1/',
+params = {'log_dir': 'logs/slim_resnet_v1_50_deconv_decoder/test/',
           'data_dir': '/usr/udo/data/',
-          'path_inference_graph': 'models/slim/graphs/vgg16_narihira2015/tfmodel_inference.meta',
-          'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
-          'restore_scope': 'vgg_16',
+          'path_inference_graph': 'models/slim/graphs/resnet_v1_50/tfmodel_inference.meta',
+          'checkpoint_path': 'models/slim/checkpoints/resnet_v1_50.ckpt',
+          'restore_scope': 'resnet_v1_50',
           'image_shape': [32 * m_height, 32 * m_width, 3],
           'initial_learning_rate': 5e-4,  # hyper param
-          'loss_opt': 'berhu',
-          'batch_size': 16,  # hyper param
-          'num_epochs': 100,  # hyper param 
-          'display_step': 20,
-          'save_step': 100,
+          'loss_opt': 'l1',
+          'batch_size': 4,  # hyper param
+          'num_epochs': 2,  # hyper param 
+          'display_step': 2,
+          'save_step': 6,
           'nodes_name_dict': nodes_name_dict,
           'norm': True,
           'plot_inference_graph': False,
-          'is_sample_size': False
+          'is_sample_size': True
          }
 
 
-# In[3]:
+# In[ ]:
 
 
 train_network(**params)
