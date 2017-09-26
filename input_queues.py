@@ -7,7 +7,9 @@ objects (images, labels, etc.)
 
 import os
 import numpy as np
+import pandas as pd
 import typing
+import json
 import tensorflow as tf
 import abc
 import scipy as sp
@@ -788,11 +790,19 @@ def next_batch_iiw(deq, output_shape, norm=True):
         # Crop image (see also input_queues.py next_batch() function)
         # randomly crop image to output shape:
         if img.shape[0]!=output_shape[0]:
-            y_start = np.random.randint(img.shape[0] - output_shape[0])
+            try:
+                y_start = np.random.randint(img.shape[0] - output_shape[0])
+            except ValueError:
+                print('invalid image height {}'.format(img.shape[0]))
+                continue
         else:
             y_start = 0
         if img.shape[1]!=output_shape[1]:
-            x_start = np.random.randint(img.shape[1] - output_shape[1])
+            try:
+                x_start = np.random.randint(img.shape[1] - output_shape[1])
+            except ValueError:
+                print('invalid image width {}'.format(img.shape[1]))
+                continue 
         else:
             x_start = 0
         img_crop = img[y_start:y_start + output_shape[0],
@@ -818,7 +828,7 @@ def next_batch_iiw(deq, output_shape, norm=True):
         images += [img_crop]
         js_labels += [jfile_crop]
                                                         
-    return images, js_label
+    return images, js_labels
 
 
 def next_batch(dataset, *args, **kwargs):
