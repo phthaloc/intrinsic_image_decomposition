@@ -611,8 +611,8 @@ def image_scale(image, random):
                             interp='bilinear', mode=None)
 
     
-def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
-               is_rotated=True, norm=True):
+def next_batch_sintel(deq, output_shape=None, is_scale=True, is_flip=True,
+                      is_rotated=True, norm=True):
     """
     Generates a new processed batch of images and labels each time it is
     called (if a DataQueue.dequeue() object is passed).
@@ -723,4 +723,110 @@ def next_batch(deq, output_shape=None, is_scale=True, is_flip=True,
         for i, col in enumerate(deq):
             batches[i].append(imgs_splitted[i])
     return list(np.stack(batch) for batch in batches)
+
+
+def next_batch_iiw(deq, output_shape=None, norm=True):
+    """
+    Generates a new processed batch of images and labels each time it is
+    called (if a DataQueue.dequeue() object is passed).
+    :param deq: typically a DataQueue.dequeue() (format pd.DataFrme!!!) object
+        which outputs a batch of data in form of a pd.DataFrame() which contains
+        paths of all images and labels.
+    :type deq: DataQueue.dequeue() object
+    :param output_shape: Spatial output shape of the image/stacked images.
+    :type output_shape: If output_shape=None (default) the output image/stacked
+        images have the same shape as the input image (if is_scale==False),
+        otherwise output_shape must be of type list with at least
+        len(output_shape)==2 elements. The output image will have shape
+        [output_shape[0], output_shape[1], channels] (where channels = input
+        channels)
+    :param norm: norm images to [0, 1] range.
+    :type norm: boolean (default: True)
+    :return: batch of images, albedo labels and shading labels
+    """
+    if output_shape:
+        imgs_stacked = image_random_crop(image=imgs_stacked,
+                                         output_shape=output_shape)
+    if norm:
+        imgs_stacked = image_normalize(image=imgs_stacked)
+    return 0
+
+
+def next_batch_iiw(deq, output_shape, norm=True):
+    """
+    Generates a new processed batch of images and labels each time it is
+    called (if a DataQueue.dequeue() object is passed).
+    :param deq: typically a DataQueue.dequeue() (format pd.DataFrme!!!) object
+        which outputs a batch of data in form of a pd.DataFrame() which contains
+        paths of images and json file labels. Data must be in form: 
+        deq.columns = (images, json_file_labels)
+    :type deq: DataQueue.dequeue() object
+    :param output_shape: Spatial output shape of the image.
+    :type output_shape: output_shape must be of type list with at least
+        len(output_shape)==2 elements. The output image will have shape
+        [output_shape[0], output_shape[1], channels] (where
+        channels = input channels)
+    :param norm: norm images to [0, 1] range.
+    :type norm: boolean (default: True)
+    :return: batch of images, batch of json file labels
+    """
+    images = []
+    js_labels = []
+    for img_path, js_label_path in deq.values:
+        img = sp.misc.imread(name=img_path, flatten=False, mode='RGB')
+        with open(js_label_path, 'r', encoding='utf-8') as infile:
+            jfile = json.load(infile)
+        # define a (copied) json label file where the crucial features 
+        # 'intrinsic_points' and 'intrinsic_comparisons' are  overwritten by
+        # the cropped data points:
+        jfile_crop = jfile.copy()
+
+        # convert these dictionaries to pd.DataFrames:
+        df_point = pd.DataFrame(jfile['intrinsic_points'])
+        df_comparisons = pd.DataFrame(jfile['intrinsic_comparisons'])
+
+        # Crop image (see also input_queues.py next_batch() function)
+        # randomly crop image to output shape:
+        if img.shape[0]!=output_shape[0]:
+            y_start = np.random.randint(img.shape[0] - output_shape[0])
+        else:
+            y_start = 0
+        if img.shape[1]!=output_shape[1]:
+            x_start = np.random.randint(img.shape[1] - output_shape[1])
+        else:
+            x_start = 0
+        img_crop = img[y_start:y_start + output_shape[0],
+                       x_start:x_start + output_shape[1], :]
+
+        # Filter for the corresponding points in 'intrinsic_points' that are in
+        # cropped image field:
+        df_point_crop = df_point[(df_point['x'] > (x_start / img.shape[1])) &
+                                 (df_point['x'] < (x_start + output_shape[1]) / img.shape[1]) &
+                                 (df_point['y'] > y_start / img.shape[0]) &
+                                 (df_point['y'] < (y_start + output_shape[0]) / img.shape[0])]
+        # save 'intrinsic_points' to new json file:
+        jfile_crop['intrinsic_points'] = df_point_crop.to_dict(orient='records')
+        # Filter for the corresponding points in 'intrinsic_comparisons' that
+        # are in cropped image field:
+        df_comparisons_crop = df_comparisons[df_comparisons['point1'].isin(df_point_crop['id']) &
+                                             df_comparisons['point2'].isin(df_point_crop['id'])]
+        jfile_crop['intrinsic_comparisons'] = df_comparisons_crop.to_dict(orient='records')
+
+        if norm:
+            img_crop = img_crop / 256
+                                
+        images += [img_crop]
+        js_labels += [jfile_crop]
+                                                        
+    return images, js_label
+
+
+def next_batch(dataset, *args, **kwargs):
+    if dataset=='sintel':
+        return next_batch_sintel(*args, **kwargs)
+    elif dataset=='iiw':
+        return next_batch_iiw(*args, **kwargs)
+    else:
+        raise ValueError("Not a valid dataset. Enter one of the following: " +
+                         "{'sintel', 'iiw'}")
 
