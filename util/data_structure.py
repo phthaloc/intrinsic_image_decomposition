@@ -1,24 +1,27 @@
 #!/usr/bin/env python
-   
+
 """
 # Create data file structures and sets:
-    
+
     This script creates csv files with file names and labels for all used data
     sets.
     The tensorflow pipeline reads the csv files later and imports images in
     batches.
-    
+
     Used data sets:
         - intrinsic imigas in the wild (iiw)
         - MPI Sintel data set
         - MIT data set
 """
-             
+
 import sys
+
 sys.path.append('./util')
 import os
 import glob
 import pandas as pd
+import scipy as sp
+import scipy.misc
 import download
 
 __author__ = "Udo Dehm"
@@ -30,10 +33,10 @@ __maintainer__ = "Udo Dehm"
 __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
+__all__ = ['', 'main']
 
-__all__ = ['', 'main'] 
 
-def create_datasets(df, p_train, p_valid, p_test, sample=True):
+def create_datasets_mit(df, p_train, p_valid, p_test, sample=True):
     """
     Splits a data set df into training, validation and testing data set with
     relative cardinality p_train, p_valid and p_test, respectively.
@@ -95,10 +98,92 @@ def create_datasets(df, p_train, p_valid, p_test, sample=True):
             df_test_sample)
 
 
-def create_datasets_sintel(df):
+def create_datasets_iiw(df, data_dir, p_train, p_valid, p_test, sample=True):
     """
     Splits a data set df into training, validation and testing data set with
     relative cardinality p_train, p_valid and p_test, respectively.
+    :param df: complete data set which should be split into training, validation
+        and testing sets
+    :type df: pd.DataFrame()
+    :param p_train: relative cardinality of training data set
+    :type p_train: float (\elem [0,1])
+    :param p_valid: relative cardinality of validation data set
+    :type p_valid: float (\elem [0,1])
+    :param p_test: relative cardinality of testing data set
+    :type p_test: float (\elem [0,1])
+    :return: training, validation and testing data sets
+    :type: [pd.DataFrame, pd.DataFrame, pd.DataFrame]
+    """
+    # make sure we have consistancy:
+    assert p_train + p_valid + p_test == 1, 'p_train, p_valid, p_test must add up to 1'
+
+    # read every file saved in column file_path and get shape:
+    df['image_shape'] = (data_dir + df['image_path']).apply(lambda x: sp.misc.imread(x).shape)
+    # expand height, width and nr of channels to separate rows
+    df['image_shape'] = df['image_shape'].apply(lambda x: x + (1,) if len(x) == 2 else x)
+    df[['image_height', 'image_width', 'image_nr_channels']] = df['image_shape'].apply(pd.Series)
+
+    # this data set will be the training data set in the end:
+    df_train = df.copy()
+
+    # put the smallest images into the test set:
+    df_test = df[(df['image_height'] < 340) | (df['image_width'] < 340)]
+    # if we have already to much samples in the test set, get rid of these:
+    if df_test.shape[0] > int(p_test * df.shape[0]):
+        # sampling data to get testing set:
+        df_test = df_test.sample(n=int(p_test * df_iiw.shape[0]),
+                                 frac=None,
+                                 replace=False,
+                                 weights=None,
+                                 random_state=42,
+                                 axis=0)
+    # sampling data to get testing set:
+    df_test_rest = df_train.sample(n=int(p_test * df.shape[0]) - df_test.shape[0],
+                                   frac=None,
+                                   replace=False,
+                                   weights=None,
+                                   random_state=42,
+                                   axis=0)
+    df_test = df_test.append(df_test_rest)
+
+    # drop these sampled test data (we do not want them in the other data sets):
+    df_train.drop(df_test.index, inplace=True)
+    # sampling data to get validation set:
+    df_valid = df_train.sample(n=int(p_valid * df.shape[0]), frac=None,
+                               replace=False, weights=None, random_state=42,
+                               axis=0)
+    # drop these sampled valid data (we do not want them in the training set):
+    df_train.drop(df_valid.index, inplace=True)
+
+    if sample:
+        # now create sample files:
+        df_train_sample = df_train.sample(n=50, frac=None, replace=False,
+                                          weights=None, random_state=42, axis=0)
+        df_valid_sample = df_valid.sample(n=20, frac=None, replace=False,
+                                          weights=None, random_state=42, axis=0)
+        df_test_sample = df_test.sample(n=20, frac=None, replace=False,
+                                        weights=None, random_state=42, axis=0)
+    else:
+        df_train_sample = pd.DataFrame()
+        df_valid_sample = pd.DataFrame()
+        df_test_sample = pd.DataFrame()
+    # print info:
+    print('data set cardinalities:\n' +
+          '    # complete data set: {}\n'.format(len(df)) +
+          '    # training data set: {}\n'.format(len(df_train)) +
+          '    # validation data set: {}\n'.format(len(df_valid)) +
+          '    # testing data set: {}\n'.format(len(df_test)) +
+          '    # sample training data set: {}\n'.format(len(df_train_sample)) +
+          '    # sample validation data set: {}\n'.format(len(df_valid_sample)) +
+          '    # sample testing data set: {}'.format(len(df_test_sample))
+          )
+    return (df_train, df_valid, df_test, df_train_sample, df_valid_sample,
+            df_test_sample)
+
+
+def create_datasets_sintel(df):
+    """
+    Splits a data set df into training, validation and testing data set.
     :param df: complete data set which should be split into training, validation
         and testing sets
     :type df: pd.DataFrame()
@@ -181,10 +266,11 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
             # get training validation and testing data set of the iiw data:
             df_iiw_train, df_iiw_valid, df_iiw_test, df_iiw_train_sample, \
             df_iiw_valid_sample, \
-            df_iiw_test_sample = create_datasets(df=df_iiw, p_train=0.8,
-                                                 p_valid=0.1,
-                                                 p_test=0.1,
-                                                 sample=True)
+            df_iiw_test_sample = create_datasets_iiw(df=df_iiw, p_train=0.8,
+                                                     data_dir=data_dir,
+                                                     p_valid=0.1,
+                                                     p_test=0.1,
+                                                     sample=True)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
@@ -435,8 +521,8 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
             # get training validation and testing data set of the mit data:
             df_mit_train, df_mit_valid, df_mit_test, _, _, \
-            _ = create_datasets(df=df_mit, p_train=0.8,
-                                p_valid=0.1, p_test=0.1, sample=False)
+            _ = create_datasets_mit(df=df_mit, p_train=0.8,
+                                    p_valid=0.1, p_test=0.1, sample=False)
 
             # save complete data set, training data set, validation data set and
             # testing data set in separate data files:
@@ -473,9 +559,9 @@ if __name__ == '__main__':
     # directory where to save csv files:
     data_dir = '../data/'
 
-    #main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
-    main(data_set='mpi_sintel_shading', data_dir=data_dir,
-         create_csv_lists=True)
-    main(data_set='mpi_sintel_complete', data_dir=data_dir,
-         create_csv_lists=True)
+    main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
+    #main(data_set='mpi_sintel_shading', data_dir=data_dir,
+    #     create_csv_lists=True)
+    #main(data_set='mpi_sintel_complete', data_dir=data_dir,
+    #     create_csv_lists=True)
     #main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
