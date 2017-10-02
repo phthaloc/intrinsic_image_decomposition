@@ -774,6 +774,8 @@ def next_batch_iiw(deq, output_shape, norm=True):
     """
     images = []
     js_labels = []
+    images_original = []
+    js_labels_original = []
     for img_path, js_label_path in deq.values:
         img = sp.misc.imread(name=img_path, flatten=False, mode='RGB')
         with open(js_label_path, 'r', encoding='utf-8') as infile:
@@ -814,6 +816,9 @@ def next_batch_iiw(deq, output_shape, norm=True):
                                  (df_point['x'] < (x_start + output_shape[1]) / img.shape[1]) &
                                  (df_point['y'] > y_start / img.shape[0]) &
                                  (df_point['y'] < (y_start + output_shape[0]) / img.shape[0])]
+        # calculate new updated/croped relative coordinates:
+        df_point_crop['x'] = (df_point_crop['x'] * img.shape[1] - x_start) / output_shape[1]
+        df_point_crop['y'] = (df_point_crop['y'] * img.shape[0] - y_start) / output_shape[0]
         # save 'intrinsic_points' to new json file:
         jfile_crop['intrinsic_points'] = df_point_crop.to_dict(orient='records')
         # Filter for the corresponding points in 'intrinsic_comparisons' that
@@ -827,8 +832,11 @@ def next_batch_iiw(deq, output_shape, norm=True):
                                 
         images += [img_crop]
         js_labels += [jfile_crop]
+        images_original += [img]
+        js_labels_original += [jfile]
                                                         
-    return images, js_labels
+    return (np.array(images), np.array(js_labels), np.array(images_original),
+            np.array(js_labels_original))
 
 
 def next_batch(dataset, *args, **kwargs):
