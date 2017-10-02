@@ -825,6 +825,33 @@ def next_batch_iiw(deq, output_shape, norm=True):
         # are in cropped image field:
         df_comparisons_crop = df_comparisons[df_comparisons['point1'].isin(df_point_crop['id']) &
                                              df_comparisons['point2'].isin(df_point_crop['id'])]
+        # for calculating the metric later it is important to do some
+        # preprocessing steps:
+        # first get only those entries that have ('1', '2', 'E') as feature
+        # 'darker':
+        df_comparisons_crop = df_comparisons_crop[df_comparisons_crop['darker'].isin(('1', '2', 'E'))]
+
+        # ensure that 'darker_score' is not None:
+        df_comparisons_crop = df_comparisons_crop[df_comparisons_crop['darker_score'].notnull()]
+
+        # ensure that 'darker_score' is > 0:
+        df_comparisons_crop = df_comparisons_crop[df_comparisons_crop['darker_score']>0]
+
+        # delete comparisons that contain opaque points ('opaque'==False):
+        df_comparisons_crop = df_comparisons_crop.merge(right=df_point[['id', 'opaque']],
+                                                        left_on='point1',
+                                                        right_on='id', 
+                                                        how='left',
+                                                        suffixes=('', '_1'))
+        df_comparisons_crop = df_comparisons_crop.merge(right=df_point[['id', 'opaque']], 
+                                                        left_on='point2',
+                                                        right_on='id',
+                                                        how='left',
+                                                        suffixes=('', '_2'))
+        df_comparisons_crop = df_comparisons_crop[(df_comparisons_crop['opaque']==True) &
+                                                  (df_comparisons_crop['opaque_2']==True)]
+        df_comparisons_crop.drop(['id_1', 'opaque', 'id_2', 'opaque_2'],
+                                 axis=1, inplace=True)
         jfile_crop['intrinsic_comparisons'] = df_comparisons_crop.to_dict(orient='records')
 
         if norm:
