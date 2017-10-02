@@ -839,12 +839,13 @@ def next_batch_iiw(deq, output_shape, norm=True):
             np.array(js_labels_original))
 
 
-def next_batch(dataset, *args, **kwargs):
-    if dataset=='sintel':
-        return next_batch_sintel(*args, **kwargs)
-    elif dataset=='iiw':
-        return next_batch_iiw(*args, **kwargs)
-    else:
-        raise ValueError("Not a valid dataset. Enter one of the following: " +
-                         "{'sintel', 'iiw'}")
+#def next_batch(dataset, *args, **kwargs):
+#    """deprecated"""
+#    if dataset=='sintel':
+#        return next_batch_sintel(*args, **kwargs)
+#    elif dataset=='iiw':
+#        return next_batch_iiw(*args, **kwargs)
+#    else:
+#        raise ValueError("Not a valid dataset. Enter one of the following: " +
+#                         "{'sintel', 'iiw'}")
 
