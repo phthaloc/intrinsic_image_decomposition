@@ -727,33 +727,6 @@ def next_batch_sintel(deq, output_shape=None, is_scale=True, is_flip=True,
     return list(np.stack(batch) for batch in batches)
 
 
-def next_batch_iiw(deq, output_shape=None, norm=True):
-    """
-    Generates a new processed batch of images and labels each time it is
-    called (if a DataQueue.dequeue() object is passed).
-    :param deq: typically a DataQueue.dequeue() (format pd.DataFrme!!!) object
-        which outputs a batch of data in form of a pd.DataFrame() which contains
-        paths of all images and labels.
-    :type deq: DataQueue.dequeue() object
-    :param output_shape: Spatial output shape of the image/stacked images.
-    :type output_shape: If output_shape=None (default) the output image/stacked
-        images have the same shape as the input image (if is_scale==False),
-        otherwise output_shape must be of type list with at least
-        len(output_shape)==2 elements. The output image will have shape
-        [output_shape[0], output_shape[1], channels] (where channels = input
-        channels)
-    :param norm: norm images to [0, 1] range.
-    :type norm: boolean (default: True)
-    :return: batch of images, albedo labels and shading labels
-    """
-    if output_shape:
-        imgs_stacked = image_random_crop(image=imgs_stacked,
-                                         output_shape=output_shape)
-    if norm:
-        imgs_stacked = image_normalize(image=imgs_stacked)
-    return 0
-
-
 def next_batch_iiw(deq, output_shape, norm=True):
     """
     Generates a new processed batch of images and labels each time it is
@@ -776,7 +749,8 @@ def next_batch_iiw(deq, output_shape, norm=True):
     js_labels = []
     images_original = []
     js_labels_original = []
-    for img_path, js_label_path in deq.values:
+    df = pd.DataFrame([], columns=['batch_nr', 'x1', 'y1', 'x2', 'y2', 'darker'])
+    for i, (img_path, js_label_path) in enumerate(deq.values):
         img = sp.misc.imread(name=img_path, flatten=False, mode='RGB')
         with open(js_label_path, 'r', encoding='utf-8') as infile:
             jfile = json.load(infile)
@@ -838,31 +812,58 @@ def next_batch_iiw(deq, output_shape, norm=True):
         df_comparisons_crop = df_comparisons_crop[df_comparisons_crop['darker_score']>0]
 
         # delete comparisons that contain opaque points ('opaque'==False):
-        df_comparisons_crop = df_comparisons_crop.merge(right=df_point[['id', 'opaque']],
+        df_comparisons_crop = df_comparisons_crop.merge(right=df_point[['id',
+                                                                        'opaque',
+                                                                        'x', 
+                                                                        'y']], 
                                                         left_on='point1',
                                                         right_on='id', 
                                                         how='left',
                                                         suffixes=('', '_1'))
-        df_comparisons_crop = df_comparisons_crop.merge(right=df_point[['id', 'opaque']], 
+        df_comparisons_crop = df_comparisons_crop.merge(right=df_point[['id',
+                                                                        'opaque',
+                                                                        'x',
+                                                                        'y']], 
                                                         left_on='point2',
-                                                        right_on='id',
+                                                        right_on='id', 
                                                         how='left',
-                                                        suffixes=('', '_2'))
-        df_comparisons_crop = df_comparisons_crop[(df_comparisons_crop['opaque']==True) &
-                                                  (df_comparisons_crop['opaque_2']==True)]
-        df_comparisons_crop.drop(['id_1', 'opaque', 'id_2', 'opaque_2'],
-                                 axis=1, inplace=True)
-        jfile_crop['intrinsic_comparisons'] = df_comparisons_crop.to_dict(orient='records')
+                                                        suffixes=('', '2'))
+        df_comparisons_crop = df_comparisons_crop[(df_comparisons_crop['opaque']==True) & 
+                                                  (df_comparisons_crop['opaque2']==True)]
+        df_comparisons_crop.drop(['id_1', 'opaque', 'id2', 'opaque2'], axis=1,
+                                 inplace=True)
+        df_comparisons_crop.rename(columns={'x':'x1', 'y':'y1'}, inplace=True)
+        jfile_crop['intrinsic_comparisons'] = df_comparisons_crop.drop(['x1', 'y1', 'x2', 'y2'],
+                                                                       axis=1).to_dict(orient='records')
+        df_comparisons_crop_whdr = df_comparisons_crop[['darker', 'x1', 'y1',
+                                                        'x2', 'y2',
+                                                        'darker_score']]
+        # introduce new numerical darker column:
+        df_comparisons_crop_whdr['darker'] = df_comparisons_crop_whdr['darker']
+        # replace 'E' (equal) with 3, transform '1' and '2' to 1 and 2:
+        df_comparisons_crop_whdr['darker'] = df_comparisons_crop_whdr['darker'].apply(lambda x: 0 if x=='E' else int(x))
+        df_comparisons_crop_whdr[['x1', 'x2']] = df_comparisons_crop_whdr[['x1', 'x2']] * output_shape[1]
+        df_comparisons_crop_whdr[['y1', 'y2']] = df_comparisons_crop_whdr[['y1', 'y2']] * output_shape[0]
+        df_comparisons_crop_whdr[['x1', 'y1', 'x2', 'y2']] = df_comparisons_crop_whdr[['x1', 'y1', 'x2', 'y2']].astype(int)
+        df_comparisons_crop_whdr['batch_nr'] = i
 
         if norm:
             img_crop = img_crop / 256
                                 
+        df = df.append(df_comparisons_crop_whdr[['batch_nr', 'x1', 'y1', 'x2',
+                                                 'y2', 'darker',
+                                                 'darker_score']],
+                       ignore_index=True)
+        
         images += [img_crop]
-        js_labels += [jfile_crop]
         images_original += [img]
+        js_labels += [jfile_crop]
         js_labels_original += [jfile]
                                                         
-    return (np.array(images), np.array(js_labels), np.array(images_original),
+    return (df,
+            np.array(images),
+            np.array(images_original),
+            np.array(js_labels),
             np.array(js_labels_original))
 
 
