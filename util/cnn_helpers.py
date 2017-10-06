@@ -432,8 +432,11 @@ def compute_whdr_tf(reflectance, df_judgements, delta=0.1):
         ['batch', 'height', 'width', channels]
     :param df_judgements: a pd.DataFrame object loaded and preprocessed from
         the Intrinsic Images in the Wild dataset.
+    :type df_judgements: pd.DataFrame with columns
+        ['batch_nr', 'darker', 'darker_score', 'x1', 'x2', 'y1', 'y2']
     :param delta: the threshold where humans switch from saying "about the same"
         to "one point is darker."
+    :type delta: float
     """
     # convert images in batch to greyscale (1 cheannel -> mean):
     imgs_grey_tf = tf.reduce_mean(reflectance, axis=3)
