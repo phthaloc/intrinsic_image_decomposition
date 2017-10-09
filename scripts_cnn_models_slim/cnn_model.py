@@ -7,7 +7,9 @@ Module that contains the CNN model!
 import sys
 sys.path.append('./util')
 
+import numpy as np
 import tensorflow as tf
+from tensorflow.contrib import slim
 from math import sqrt
 
 import cnn_helpers as cnnhelp
@@ -25,7 +27,8 @@ __email__ = "udo.dehm@mailbox.org"
 __status__ = "Development"
 
 
-__all__ = ['model_narihira2015', 'create_inference_graph']   
+__all__ = ['model_narihira2015', 'create_inference_graph', 'upproject_arg_scope',
+           '_prepare_indices', '_unpool_as_conv', 'up_project']
 
 
 def model_narihira2015(inputs,
@@ -425,6 +428,310 @@ def create_inference_graph(modelfunc, save_path, device='/cpu:0'):
         # # this saves data:
         # saver.save(sess, save_path + 'tfmodel_inference')
         # return model_output
+
+
+################################################################################
+# Operations, specific to FCRN (UpProjection)
+# see https://arxiv.org/abs/1606.00373
+# unpool layers performed with conv2d layers (more efficient than unpooling
+# layers)
+################################################################################
+
+
+def upproject_arg_scope(weight_decay=0.0001,
+                        batch_norm_decay=0.997,
+                        batch_norm_epsilon=1e-5,
+                        batch_norm_scale=True,
+                        activation_fn=tf.nn.relu,
+                        use_batch_norm=True,
+                        is_training=False):
+    """
+    Defines the default ResNet arg scope.
+    Apply by using: with slim.arg_scope(upproject_arg_scope()):
+
+    TODO(gpapan): The batch-normalization related default values above are
+    appropriate for use in conjunction with the reference ResNet models
+    released at https://github.com/KaimingHe/deep-residual-networks. When
+    training ResNets from scratch, they might need to be tuned.
+
+    :param weight_decay: The weight decay to use for regularizing the model.
+    :param batch_norm_decay: The moving average decay when estimating layer
+     activation statistics in batch normalization.
+    :param batch_norm_epsilon: Small constant to prevent division by zero when
+     normalizing activations by their variance in batch normalization.
+    :param batch_norm_scale: If True, uses an explicit `gamma` multiplier to
+     scale the activations in the batch normalization layer.
+    :param activation_fn: The activation function which is used in ResNet.
+    :param use_batch_norm: Whether or not to use batch normalization.
+
+    :returns: An 'arg_scope' to use for the upproject models.
+    """
+
+    batch_norm_params = {'decay': batch_norm_decay,
+                         'epsilon': batch_norm_epsilon,
+                         'scale': batch_norm_scale,
+                         'updates_collections': tf.GraphKeys.UPDATE_OPS,
+                         'is_training': is_training}
+
+    with slim.arg_scope([slim.conv2d],
+                        weights_regularizer=slim.l2_regularizer(weight_decay),
+                        weights_initializer=slim.variance_scaling_initializer(),
+                        activation_fn=activation_fn,
+                        normalizer_fn=slim.batch_norm if use_batch_norm else None,
+                        normalizer_params=batch_norm_params):
+        with slim.arg_scope([slim.batch_norm], **batch_norm_params) as arg_sc:
+            return arg_sc
+
+
+def _prepare_indices(before, row, col, after, dims):
+    """
+
+    :param before:
+    :param row:
+    :param col:
+    :param after:
+    :param dims:
+    :return:
+    """
+    x0, x1, x2, x3 = np.meshgrid(before, row, col, after)
+
+    x_0 = tf.Variable(x0.reshape([-1]), name='x_0')
+    x_1 = tf.Variable(x1.reshape([-1]), name='x_1')
+    x_2 = tf.Variable(x2.reshape([-1]), name='x_2')
+    x_3 = tf.Variable(x3.reshape([-1]), name='x_3')
+
+    summand2 = dims[3].value * x_2
+    summand3 = 2 * dims[2].value * dims[3].value * x_0 * 2 * dims[1].value
+    summand4 = 2 * dims[2].value * dims[3].value * x_1
+    linear_indices = x_3 + summand2 + summand3 + summand4
+
+    linear_indices_int = tf.to_int32(linear_indices)
+
+    return linear_indices_int
+
+
+def _unpool_as_conv(input_data,
+                    num_outputs,
+                    batch_size,
+                    stride=1,
+                    relu=False,
+                    use_batch_norm=True,
+                    bn_decay=0.999,
+                    bn_epsilon=0.001,
+                    is_training=True):
+    """
+    Model upconvolutions (unpooling + convolution) as interleaving feature
+    maps of four convolutions (A,B,C,D). Building block for up-projections.
+
+    :param input_data:
+    :param num_outputs:
+    :param stride:
+    :param ReLU:
+    :param BN:
+    :param is_training:
+    :return:
+    """
+    with tf.variable_scope(name_or_scope='unpool_convs',
+                           default_name='unpool_convs',
+                           values=[input_data]):
+        with slim.arg_scope(upproject_arg_scope(weight_decay=0.0001,
+                                                batch_norm_decay=bn_decay,
+                                                batch_norm_epsilon=bn_epsilon,
+                                                batch_norm_scale=True,
+                                                activation_fn=None,
+                                                use_batch_norm=False,
+                                                is_training=is_training)):
+            ####################################################################
+            # Convolution A (3x3)
+            outputA = slim.conv2d(inputs=input_data,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  stride=stride,
+                                  scope='convA')
+            ####################################################################
+            # Convolution B (2x3)
+            # add zeros to input data: 1 row on top and one row on left and
+            # right of image respectively
+            padded_input_B = tf.pad(input_data,
+                                    [[0, 0], [1, 0], [1, 1], [0, 0]],
+                                    'CONSTANT')
+            outputB = slim.conv2d(inputs=padded_input_B,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[2, 3],
+                                  padding='VALID',
+                                  stride=stride,
+                                  scope='convB')
+            ####################################################################
+            # Convolution C (3x2)
+            padded_input_C = tf.pad(input_data,
+                                    [[0, 0], [1, 1], [1, 0], [0, 0]],
+                                    'CONSTANT')
+            outputC = slim.conv2d(inputs=padded_input_C,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[3, 2],
+                                  padding='VALID',
+                                  stride=stride,
+                                  scope='convC')
+            ####################################################################
+            # Convolution D (2x2)
+            padded_input_D = tf.pad(input_data,
+                                    [[0, 0], [1, 0], [1, 0], [0, 0]],
+                                    'CONSTANT')
+            outputD = slim.conv2d(inputs=padded_input_D,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[2, 2],
+                                  padding='VALID',
+                                  stride=stride,
+                                  scope='convD')
+
+    ############################################################################
+    # Interleaving elements of the four feature maps:
+    with tf.variable_scope('interleaving_elements'):
+        dims = outputA.get_shape()
+        dim1 = dims[1] * 2
+        dim2 = dims[2] * 2
+
+        A_row_indices = range(0, dim1, 2)
+        A_col_indices = range(0, dim2, 2)
+        B_row_indices = range(1, dim1, 2)
+        B_col_indices = range(0, dim2, 2)
+        C_row_indices = range(0, dim1, 2)
+        C_col_indices = range(1, dim2, 2)
+        D_row_indices = range(1, dim1, 2)
+        D_col_indices = range(1, dim2, 2)
+
+        all_indices_before = range(int(batch_size))
+        all_indices_after = range(dims[3])
+
+        A_linear_indices = _prepare_indices(all_indices_before,
+                                            A_row_indices,
+                                            A_col_indices,
+                                            all_indices_after,
+                                            dims)
+        B_linear_indices = _prepare_indices(all_indices_before,
+                                            B_row_indices,
+                                            B_col_indices,
+                                            all_indices_after,
+                                            dims)
+        C_linear_indices = _prepare_indices(all_indices_before,
+                                            C_row_indices,
+                                            C_col_indices,
+                                            all_indices_after,
+                                            dims)
+        D_linear_indices = _prepare_indices(all_indices_before,
+                                            D_row_indices,
+                                            D_col_indices,
+                                            all_indices_after,
+                                            dims)
+
+        A_flat = tf.reshape(tf.transpose(outputA, [1, 0, 2, 3]), [-1])
+        B_flat = tf.reshape(tf.transpose(outputB, [1, 0, 2, 3]), [-1])
+        C_flat = tf.reshape(tf.transpose(outputC, [1, 0, 2, 3]), [-1])
+        D_flat = tf.reshape(tf.transpose(outputD, [1, 0, 2, 3]), [-1])
+
+        Y_flat = tf.dynamic_stitch([A_linear_indices,
+                                    B_linear_indices,
+                                    C_linear_indices,
+                                    D_linear_indices],
+                                   [A_flat, B_flat,
+                                    C_flat, D_flat])
+        Y = tf.reshape(Y_flat, shape=tf.to_int32([-1, dim1.value,
+                                                  dim2.value,
+                                                  dims[3].value]))
+
+    ############################################################################
+    if use_batch_norm:
+        Y = slim.batch_norm(inputs=Y,
+                            decay=bn_decay,
+                            scale=True,
+                            epsilon=bn_epsilon,
+                            activation_fn=None,
+                            is_training=is_training,
+                            scope='batch_norm')
+    ############################################################################
+    if relu:
+        Y = tf.nn.relu(Y, name='relu')
+
+    return Y
+
+
+def up_project(input_data,
+               kernel_size,
+               num_outputs,
+               batch_size,
+               scope,
+               stride=1,
+               use_batch_norm=False,
+               bn_decay=0.999,
+               bn_epsilon=0.001,
+               is_training=True):
+    """
+    tf slim implementation of up-projection layers of publication
+    https://arxiv.org/abs/1606.00373 that leads to 2 * spatial input shape.
+
+    :param input_data: tf input tensor node
+    :param num_outputs: number of output filters (output channels).
+    :type num_outputs: int
+    :param kernel_size: A sequence of 2 positive integers specifying the spatial
+     dimensions of the filters ['width', 'height'].
+    :type kernel_size: list
+    :param batch_size:
+    :param scope:
+    :param stride:
+    :param BN:
+    """
+    # Create residual upsampling layer (UpProjection)
+    with tf.variable_scope(name_or_scope=scope,
+                           default_name='up_projection',
+                           values=[input_data]):
+        # Branch 1
+        with tf.variable_scope(name_or_scope='branch1', values=[input_data]):
+             # Interleaving Convs of 1st branch
+             out = _unpool_as_conv(input_data=input_data,
+                                   num_outputs=num_outputs,
+                                   batch_size=batch_size,
+                                   stride=stride,
+                                   relu=True,
+                                   use_batch_norm=True,
+                                   bn_decay=bn_decay,
+                                   bn_epsilon=bn_epsilon,
+                                   is_training=True)
+             with slim.arg_scope(upproject_arg_scope(weight_decay=0.0001,
+                                                     batch_norm_decay=bn_decay,
+                                                     batch_norm_epsilon=bn_epsilon,
+                                                     batch_norm_scale=True,
+                                                     activation_fn=None,
+                                                     use_batch_norm=use_batch_norm,
+                                                     is_training=is_training)):
+                 # Convolution following the upProjection on the 1st branch
+                 branch1_output = slim.conv2d(inputs=out,
+                                              num_outputs=num_outputs,
+                                              kernel_size=kernel_size,
+                                              padding='SAME',
+                                              stride=stride,
+                                              scope='conv')
+
+        ########################################################################
+        # Branch 2
+        with tf.variable_scope(name_or_scope='branch2', values=[input_data]):
+             # Interleaving convolutions and output of 2nd branch
+             branch2_output = _unpool_as_conv(input_data=input_data,
+                                              num_outputs=num_outputs,
+                                              batch_size=batch_size,
+                                              stride=stride,
+                                              relu=False,
+                                              use_batch_norm=True,
+                                              bn_decay=bn_decay,
+                                              bn_epsilon=bn_epsilon,
+                                              is_training=True)
+
+        # sum branches
+        output = tf.add_n([branch1_output, branch2_output],
+                          name='sum_branches')
+        # ReLU
+        output = tf.nn.relu(output, name='relu')
+        return output
 
 
 if __name__ == "__main__":
