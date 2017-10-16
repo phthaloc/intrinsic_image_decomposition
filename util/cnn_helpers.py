@@ -598,5 +598,13 @@ def human_disagreement_loss(reflectance, point1, point2, human_labels, weights,
     # It's called the mean weighted human disagreement loss (MWHDL):
     total_loss_weights = tf.reduce_mean(loss_per_row * weights)
     total_loss_weights_sum = tf.reduce_sum(loss_per_row * weights)
-    return total_loss #, total_loss_sum, total_loss_weights, total_loss_weights_sum
+
+    # write tensorboard loss summaries:
+    tf.summary.scalar(name='mhdl_loss', tensor=total_loss)
+    tf.summary.scalar(name='shdl_loss', tensor=total_loss_sum)
+    tf.summary.scalar(name='mwhdl_loss', tensor=total_loss_weights)
+    tf.summary.scalar(name='swhdl_loss', tensor=total_loss_weights_sum)
+    
+    return (total_loss , total_loss_sum, total_loss_weights,
+            total_loss_weights_sum)
 
