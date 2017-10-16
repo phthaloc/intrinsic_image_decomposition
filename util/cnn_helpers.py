@@ -498,3 +498,89 @@ def compute_whdr_tf(reflectance, point1, point2, human_labels, weights,
     # get whdr over batch:
     return error_sum / weight_sum
 
+
+def compute_whdr_tf_new(reflectance, point1, point2, human_labels, weights,
+                        delta=0.1):
+    """
+    This is the Tensorflow implementation of the
+    util.whdr_py3.compute_whdr() function
+    Return the WHDR score for a reflectance image, evaluated against human
+    judgements.  The return value is in the range 0.0 to 1.0.
+    See section 3.5 of our paper for more details.
+    :param reflectance: a tf tensor containing linear RGB reflectance
+        images (in batches).
+    :type reflectance: tf. tensor of shape
+        ['batch', 'height', 'width', channels]
+    :param point1: list of point1 comparisons indices (these points are compared
+        to corresponding entries of point2)
+    :type point1: tf tensor object with shape ['batch', 'height', 'width'] and
+        dtype=tf.int32
+    :param point2: list of point2 comparisons indices (these points are compared
+        to corresponding entries of point1)
+    :type point2: tf tensor object with shape ['batch', 'height', 'width'] and
+        dtype=tf.int32
+    :param human_labels: list of human labels (according to iiw data set)
+        corresponding to point1 and point2 entries
+    :type human_labels: tf tensor object with shape ['darker'] and
+        dtype=tf.int32
+    :param weights: list of weights/ darker scores/ darker weights, 
+        corresponding to point1, point2 and human_labels entries
+    :type weights: tf tensor object with shape ['darker_score'] and 
+        dtype=tf.float32
+    :param delta: the threshold where humans switch from saying "about the same"
+        to "one point is darker."
+    :type delta: float
+    """
+    # convert images in batch to greyscale (1 cheannel -> mean):
+    imgs_grey_tf = tf.reduce_mean(reflectance, axis=3)
+    # select pixels which are compared with each other (comp_p1_batch contains
+    # all pixels that represent point1 and comp_p2_batch contains all pixels
+    # that represent point2 over all samples in the batch. Points in
+    # comp_p1_batch and comp_p2_batch are in the same order (important for
+    # comparison)):
+    comp_p1_batch = tf.gather_nd(imgs_grey_tf, point1)
+    comp_p2_batch = tf.gather_nd(imgs_grey_tf, point2)
+    
+    # define/convert to pixel threshold:
+    # comp_p1_batch = tf.maximum(comp_p1_batch, 1e-10)
+    # comp_p2_batch = tf.maximum(comp_p2_batch, 1e-10)
+
+    assert comp_p1_batch.shape==comp_p2_batch.shape, 'Missmatch in point ' + \
+           'comparison length: ' + \
+           'comp_p1_batch.shape={}, '.format(comp_p1_batch.shape) + \
+           'comp_p2_batch.shape={}.'.format(comp_p2_batch.shape)
+ 
+    # class 1 (point p1==A_{1,i} is darker):
+    cl1 = comp_p2_batch - comp_p1_batch - delta * (comp_p1_batch + comp_p2_batch) / 2
+    # class 2 (point p2==A_{2,i} is darker):
+    cl2 = comp_p1_batch - comp_p2_batch - delta * (comp_p1_batch + comp_p2_batch) / 2
+    # class 0 (both points are about the same):
+    cl0 = - tf.abs(comp_p1_batch - comp_p2_batch) + delta * (comp_p1_batch + comp_p2_batch) / 2
+    # init tensors for human comparison score:
+    # pixel compare to approx. same darkness:
+    comparisons_eq = tf.zeros_like(comp_p1_batch, dtype=tf.int32)
+    # pixel 1 is darker than px 2:
+    comparisons_p1_darker = tf.ones_like(comp_p1_batch, dtype=tf.int32)
+    # pixel 2 is darker than px 1:
+    comparisons_p2_darker = tf.ones_like(comp_p1_batch, dtype=tf.int32) * 2
+    # select 1 if px 1 is darker than px 2:
+    px1_darker = tf.where(condition=comp_p2_batch / comp_p1_batch > 1.0 + delta,
+                          x=comparisons_p1_darker, y=comparisons_eq)
+    # select 2 if px 2 is darker than px 1:
+    px2_darker = tf.where(condition=comp_p1_batch / comp_p2_batch > 1.0 + delta,
+                          x=comparisons_p2_darker, y=comparisons_eq)
+    # combine above by summing (-> 0 belongs to approx the same darkness):
+    darker = px1_darker + px2_darker
+
+    # compare human labels to algorithm darker predictions:
+    hum_alg_comp = tf.not_equal(darker, human_labels)
+    # summed weights:
+    weight_sum = tf.reduce_sum(weights)
+    # only select such weights that belong to prediction - human label mismatch:
+    error_weights = tf.where(condition=hum_alg_comp,
+                             x=weights,
+                             y=tf.zeros_like(hum_alg_comp, dtype=tf.float32))
+    # sum all error_weights
+    error_sum = tf.reduce_sum(error_weights)
+    # get whdr over batch:
+    return error_sum / weight_sum
