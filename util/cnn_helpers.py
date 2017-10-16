@@ -422,6 +422,9 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
 def compute_whdr_tf(reflectance, point1, point2, human_labels, weights,
                     delta=0.1):
     """
+    DEPRECATED: This loss cannot be applied since it contains non-differentiable
+    functions (like greater, equal functions). Gradients cannot be calculated
+    and error cannot be backpropagated.
     This is the Tensorflow implementation of the
     util.whdr_py3.compute_whdr() function
     Return the WHDR score for a reflectance image, evaluated against human
@@ -499,8 +502,8 @@ def compute_whdr_tf(reflectance, point1, point2, human_labels, weights,
     return error_sum / weight_sum
 
 
-def compute_whdr_tf_new(reflectance, point1, point2, human_labels, weights,
-                        delta=0.1):
+def human_disagreement_loss(reflectance, point1, point2, human_labels, weights,
+                            delta=0.1):
     """
     This is the Tensorflow implementation of the
     util.whdr_py3.compute_whdr() function
@@ -556,31 +559,44 @@ def compute_whdr_tf_new(reflectance, point1, point2, human_labels, weights,
     cl2 = comp_p1_batch - comp_p2_batch - delta * (comp_p1_batch + comp_p2_batch) / 2
     # class 0 (both points are about the same):
     cl0 = - tf.abs(comp_p1_batch - comp_p2_batch) + delta * (comp_p1_batch + comp_p2_batch) / 2
-    # init tensors for human comparison score:
-    # pixel compare to approx. same darkness:
-    comparisons_eq = tf.zeros_like(comp_p1_batch, dtype=tf.int32)
-    # pixel 1 is darker than px 2:
-    comparisons_p1_darker = tf.ones_like(comp_p1_batch, dtype=tf.int32)
-    # pixel 2 is darker than px 1:
-    comparisons_p2_darker = tf.ones_like(comp_p1_batch, dtype=tf.int32) * 2
-    # select 1 if px 1 is darker than px 2:
-    px1_darker = tf.where(condition=comp_p2_batch / comp_p1_batch > 1.0 + delta,
-                          x=comparisons_p1_darker, y=comparisons_eq)
-    # select 2 if px 2 is darker than px 1:
-    px2_darker = tf.where(condition=comp_p1_batch / comp_p2_batch > 1.0 + delta,
-                          x=comparisons_p2_darker, y=comparisons_eq)
-    # combine above by summing (-> 0 belongs to approx the same darkness):
-    darker = px1_darker + px2_darker
+    # stack cl0, cl1, cl2 into one tensor. Each row represents one comparison of
+    # all available batches, each column represents a class. all entries in one
+    # row can be interpreted as unnormalized log probabilities voting for each
+    # class:
+    log_probabs = tf.stack(values=[cl0, cl1, cl2], axis=1)
+    # OHE labels to have form [cl0, cl1, cl2]:
+    # labels = tf.one_hot(indices=human_labels, depth=3, on_value=1.0,
+    #                     off_value=0.0, axis=-1, dtype=None, name=None)
+    # apply softmax to transform log probabilities to range [0,1] which can be
+    # interpreted as actual normalized probabilities:
+    # probabs = tf.nn.softmax(log_probabs)
+    # loss_per_row = - tf.reduce_sum(labels * tf.log(probabs),
+    #                                reduction_indices=[1])
+    # a more robust implementation of the last 3 lines is the following:
+    # loss_per_row = tf.nn.softmax_cross_entropy_with_logits(labels=labels,
+    #                                                        logits=log_probabs,
+    #                                                        dim=-1,
+    #                                                        name=None)
+    
+    # even more robust implementation because we have 'hard' classes (no
+    # probability labels, but always [0, 1, 0] labels):
+    # result is the cross entropy for each row (class distributions); basically
+    # we get as result 1 if we have (0.33, 0.33, 0.33) distribution over all
+    # classes and >>1 if we assign wrong class, eg -1.0*log(0.1), and <<1 if
+    # assign correct class with high probability, eg -1.0*log(0.9):
+    loss_per_row = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=human_labels,
+                                                                  logits=log_probabs,
+                                                                  name=None)
+    # total_loss gives a mean (mean over all comparisons in all batch samples)
+    # loss comparisons where humans and our predictions disagree, count the
+    # most. It's called the mean human disagreement loss (MHDL) 
+    total_loss = tf.reduce_mean(loss_per_row)
+    # same as above but instead of mean use sum:
+    total_loss_sum = tf.reduce_sum(loss_per_row)
+    # the  total_loss_weights multiplies (weights) each loss with the
+    # darker_score/darker_weight before taking the mean over all 'row losses'.
+    # It's called the mean weighted human disagreement loss (MWHDL):
+    total_loss_weights = tf.reduce_mean(loss_per_row * weights)
+    total_loss_weights_sum = tf.reduce_sum(loss_per_row * weights)
+    return total_loss #, total_loss_sum, total_loss_weights, total_loss_weights_sum
 
-    # compare human labels to algorithm darker predictions:
-    hum_alg_comp = tf.not_equal(darker, human_labels)
-    # summed weights:
-    weight_sum = tf.reduce_sum(weights)
-    # only select such weights that belong to prediction - human label mismatch:
-    error_weights = tf.where(condition=hum_alg_comp,
-                             x=weights,
-                             y=tf.zeros_like(hum_alg_comp, dtype=tf.float32))
-    # sum all error_weights
-    error_sum = tf.reduce_sum(error_weights)
-    # get whdr over batch:
-    return error_sum / weight_sum
