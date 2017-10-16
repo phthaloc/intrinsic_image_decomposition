@@ -595,11 +595,11 @@ def _unpool_as_conv(input_data,
         A_row_indices = range(0, dim1, 2)
         A_col_indices = range(0, dim2, 2)
         B_row_indices = range(1, dim1, 2)
-        B_col_indices = range(0, dim2, 2)
-        C_row_indices = range(0, dim1, 2)
+        B_col_indices = range(0, dim2, 2)  # = A_col_indices
+        C_row_indices = range(0, dim1, 2)  # = A_row_indices
         C_col_indices = range(1, dim2, 2)
-        D_row_indices = range(1, dim1, 2)
-        D_col_indices = range(1, dim2, 2)
+        D_row_indices = range(1, dim1, 2)  # = B_row_indices
+        D_col_indices = range(1, dim2, 2)  # = C_col_indices
 
         all_indices_before = range(int(batch_size))
         all_indices_after = range(dims[3])
@@ -636,7 +636,7 @@ def _unpool_as_conv(input_data,
                                     D_linear_indices],
                                    [A_flat, B_flat,
                                     C_flat, D_flat])
-        Y = tf.reshape(Y_flat, shape=tf.to_int32([-1, dim1.value,
+        Y = tf.reshape(Y_flat, shape=tf.to_int32([batch_size, dim1.value,
                                                   dim2.value,
                                                   dims[3].value]))
 
