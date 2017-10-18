@@ -18,7 +18,7 @@ __status__ = "Development"
 
 
 __all__ = ['conv2d_layer', 'get_valid_pixels', 'berhu_loss', 'l2_loss',
-           'loss_fct']
+           'sintel_loss_fct', 'human_disagreement_loss', 'compute_whdr_tf']
 
 
 def conv2d_layer(inputs,
@@ -179,36 +179,6 @@ def conv2d_layer(inputs,
     return act
 
 
-# def loss_fct(label_albedo,
-#              label_shading,
-#              prediction_albedo,
-#              prediction_shading,
-#              lambda_):
-#     """
-#     Computes loss function (it compares ground truth (labels) to predictions
-#     y)
-#     """
-#     with tf.name_scope('loss'):
-#         mse_alb = tf.reduce_mean(tf.square(prediction_albedo - label_albedo))
-#         reduced_alb = tf.square(tf.reduce_mean(prediction_albedo - label_albedo))
-#
-#         mse_shad = tf.reduce_mean(tf.square(prediction_shading - label_shading))
-#         reduced_shad = tf.square(tf.reduce_mean(prediction_shading - label_shading))
-#
-#         # least square loss if lambda_ = 0, scale invariant loss if
-#         # lambda_ = 1, average of both if lambda_ = 0.5:
-#         loss = (mse_alb - lambda_ * reduced_alb) + (mse_shad - lambda_ * reduced_shad)
-#         # create summaries that give outputs (TensorFlow ops that output
-#         # protocol buffers containing 'summarized' data) of some scalar
-#         # parameters, like evolution of loss function (how does it change
-#         # over time? / rather not weights  because there are usually several
-#         # of them) etc (tf.summary.scalar())
-#         # (have a look at parameters that change over time (= training
-#         # steps))
-#         tf.summary.scalar(name='loss', tensor=loss)
-#     return loss
-
-
 def get_valid_pixels(image, invalid_mask=None):
     """
     :param image:
@@ -343,8 +313,8 @@ def l1_loss(label, prediction, valid_mask=None):
     return loss 
 
 
-def loss_fct(label_albedo, label_shading, prediction_albedo,
-             prediction_shading, lambda_, loss_type, valid_mask=None):
+def sintel_loss_fct(label_albedo, label_shading, prediction_albedo,
+                    prediction_shading, lambda_, loss_type, valid_mask=None):
     """
     Computes loss function (it compares ground truth (labels) to predictions
     y)
@@ -404,7 +374,7 @@ def loss_fct(label_albedo, label_shading, prediction_albedo,
                                   valid_mask=valid_mask)
         lambda_str = loss_type  # + logstr
     else:
-        raise TypeError("Enter valid loss_type ('l1', 'l2', 'berhu').")
+        raise ValueError("Enter valid loss_type ('l1', 'l2', 'berhu').")
 
     loss = loss_albedo + loss_shading
     # create summaries that give outputs (TensorFlow ops that output
@@ -505,12 +475,8 @@ def compute_whdr_tf(reflectance, point1, point2, human_labels, weights,
 def human_disagreement_loss(reflectance, point1, point2, human_labels, weights,
                             delta=0.1):
     """
-    This is the Tensorflow implementation of the
-    util.whdr_py3.compute_whdr() function
-    Return the WHDR score for a reflectance image, evaluated against human
-    judgements.  The return value is in the range 0.0 to 1.0.
-    See section 3.5 of our paper for more details.
-    :param reflectance: a tf tensor containing linear RGB reflectance
+    Tensorflow implementation of the mean (weighted) human disagreement losses.
+    :param reflectance: a tf tensor containing linear RGB reflectance (albedo)
         images (in batches).
     :type reflectance: tf. tensor of shape
         ['batch', 'height', 'width', channels]
@@ -533,6 +499,8 @@ def human_disagreement_loss(reflectance, point1, point2, human_labels, weights,
     :param delta: the threshold where humans switch from saying "about the same"
         to "one point is darker."
     :type delta: float
+    :returns: mean human disagreement loss, mean weighted human disagreement
+        loss
     """
     # convert images in batch to greyscale (1 cheannel -> mean):
     imgs_grey_tf = tf.reduce_mean(reflectance, axis=3)
@@ -591,20 +559,86 @@ def human_disagreement_loss(reflectance, point1, point2, human_labels, weights,
     # loss comparisons where humans and our predictions disagree, count the
     # most. It's called the mean human disagreement loss (MHDL) 
     total_loss = tf.reduce_mean(loss_per_row)
-    # same as above but instead of mean use sum:
-    total_loss_sum = tf.reduce_sum(loss_per_row)
     # the  total_loss_weights multiplies (weights) each loss with the
     # darker_score/darker_weight before taking the mean over all 'row losses'.
     # It's called the mean weighted human disagreement loss (MWHDL):
     total_loss_weights = tf.reduce_mean(loss_per_row * weights)
-    total_loss_weights_sum = tf.reduce_sum(loss_per_row * weights)
 
     # write tensorboard loss summaries:
     tf.summary.scalar(name='mhdl_loss', tensor=total_loss)
-    tf.summary.scalar(name='shdl_loss', tensor=total_loss_sum)
     tf.summary.scalar(name='mwhdl_loss', tensor=total_loss_weights)
-    tf.summary.scalar(name='swhdl_loss', tensor=total_loss_weights_sum)
     
-    return (total_loss , total_loss_sum, total_loss_weights,
-            total_loss_weights_sum)
+    return total_loss, total_loss_weights
+            
+
+def iiw_loss_fct(input_image, prediction_albedo, prediction_shading,
+                 albedo_comp_point1, albedo_comp_point2,
+                 albedo_comp_human_labels, albedo_comp_weights,
+                 albedo_comp_delta=0.1, lambda_=1.0):
+    """
+    Computes loss functions (L1 or L2 loss in combination with mean human
+    disagreement loss (mhdl) or mean weighted human disagreement loss (mwhdl))
+    of IIW dataset
+    :param input_image: network input image of shape
+        (batch, height, width, channels).
+    :type input_image: np.array or tf tensor RGB image
+    :param prediction_albedo: prediction (network output) of albedo image
+        of shape (batch, height, width, channels)
+    :type prediction_albedo: np.array or tf tensor RGB image
+    :param prediction_shading: prediction (network output) of shading 
+        image of shape (batch, height, width, channels)
+    :type prediction_shading: np.array or tf tensor RGB image
+    :param albedo_comp_point1: see param point1 in human_disagreement_loss()
+    :param albedo_comp_point2: see param point2 in human_disagreement_loss()
+    :param albedo_comp_human_labels: see param human_labels in
+        human_disagreement_loss()
+    :param albedo_comp_weights: see param weights in human_disagreement_loss()
+    :param albedo_comp_delta: see param delta in human_disagreement_loss()
+    :param lambda_: Loss 'regularizer' (L_1/2 + lambda * M(W)HDL)
+    :type lambda_: float 
+    :return: loss_l1_mhdl, loss_l1_mwhdl, loss_l2_mhdl, loss_l2_mwhdl,
+        loss_l1, loss_l2, mhdl_loss, mwhdl_loss
+    """
+
+    loss_l2 = l2_loss(label=input_image,
+                      prediction=prediction_albedo*prediction_shading,
+                      lambda_=0,
+                      valid_mask=None)
+    tf.summary.scalar(name='loss_l2', tensor=loss_l2)
+
+    loss_l1 = l1_loss(label=input_image,
+                      prediction=prediction_albedo*prediction_shading,
+                      valid_mask=None)
+    tf.summary.scalar(name='loss_l1', tensor=loss_l1)
+
+    human_dis_loss = human_disagreement_loss(reflectance=prediction_albedo, 
+                                             point1=albedo_comp_point1,
+                                             point2=albedo_comp_point2,
+                                             human_labels=albedo_comp_human_labels,
+                                             weights=albedo_comp_weights,
+                                             delta=albedo_comp_delta)
+    mhdl_loss, mwhdl_loss = human_dis_loss
+
+    loss_l1_mhdl = loss_l1 + lambda_ * mhdl_loss
+    loss_l1_mwhdl = loss_l1 + lambda_ * mwhdl_loss
+    loss_l2_mhdl = loss_l2 + lambda_ * mhdl_loss
+    loss_l2_mwhdl = loss_l2 + lambda_ * mwhdl_loss
+
+    # create summaries that give outputs (TensorFlow ops that output
+    # protocol buffers containing 'summarized' data) of some scalar
+    # parameters, like evolution of loss function (how does it change
+    # over time? / rather not weights  because there are usually several
+    # of them) etc (tf.summary.scalar())
+    # (have a look at parameters that change over time (= training
+    # steps))
+    tf.summary.scalar(name='loss_l1_mhdl_lambda{}'.format(lambda_),
+                      tensor=loss_l1_mhdl)
+    tf.summary.scalar(name='loss_l1_mwhdl_lambda{}'.format(lambda_),
+                      tensor=loss_l1_mwhdl)
+    tf.summary.scalar(name='loss_l2_mhdl_lambda{}'.format(lambda_),
+                      tensor=loss_l2_mhdl)
+    tf.summary.scalar(name='loss_l2_mwhdl_lambda{}'.format(lambda_),
+                      tensor=loss_l2_mwhdl)
+    return (loss_l1_mhdl, loss_l1_mwhdl, loss_l2_mhdl, loss_l2_mwhdl,
+            loss_l1, loss_l2, mhdl_loss, mwhdl_loss)
 
