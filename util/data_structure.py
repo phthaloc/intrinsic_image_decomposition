@@ -123,28 +123,22 @@ def create_datasets_iiw(df, data_dir, p_train, p_valid, p_test, sample=True):
     df['image_shape'] = df['image_shape'].apply(lambda x: x + (1,) if len(x) == 2 else x)
     df[['image_height', 'image_width', 'image_nr_channels']] = df['image_shape'].apply(pd.Series)
 
+    print('Deleted {} '.format(df[(df['image_height'] < 340) | (df['image_width'] < 340)].shape[0]) +
+          'images because of too small image height or width')
+
+    # delete images that are too small:
+    df = df[(df['image_height'] >= 340) & (df['image_width'] >= 340)]
+
     # this data set will be the training data set in the end:
     df_train = df.copy()
 
-    # put the smallest images into the test set:
-    df_test = df[(df['image_height'] < 340) | (df['image_width'] < 340)]
-    # if we have already to much samples in the test set, get rid of these:
-    if df_test.shape[0] > int(p_test * df.shape[0]):
-        # sampling data to get testing set:
-        df_test = df_test.sample(n=int(p_test * df_iiw.shape[0]),
-                                 frac=None,
-                                 replace=False,
-                                 weights=None,
-                                 random_state=42,
-                                 axis=0)
     # sampling data to get testing set:
-    df_test_rest = df_train.sample(n=int(p_test * df.shape[0]) - df_test.shape[0],
-                                   frac=None,
-                                   replace=False,
-                                   weights=None,
-                                   random_state=42,
-                                   axis=0)
-    df_test = df_test.append(df_test_rest)
+    df_test = df_train.sample(n=int(p_test * df.shape[0]),
+                              frac=None,
+                              replace=False,
+                              weights=None,
+                              random_state=42,
+                              axis=0)
 
     # drop these sampled test data (we do not want them in the other data sets):
     df_train.drop(df_test.index, inplace=True)
@@ -210,7 +204,7 @@ def create_datasets_sintel(df):
     df_valid = df_valid_filtered.drop('scene_c', axis=1).sample(frac=1)
     # create test set from validation set by randomly sampling 5 elements
     # from each of the validation scene:
-    df_test = df_valid_filtered.groupby('scene_c').apply(lambda x: x.sample(n=5))
+    df_test = df_valid_filtered.groupby('scene_c').apply(lambda x: x.sample(n=16))
     # delete irrelevant columns
     df_test.drop('scene_c', axis=1, inplace=True)
     # delete multi index:
@@ -557,11 +551,11 @@ def main(data_set, data_dir='data/', create_csv_lists=True):
 
 if __name__ == '__main__':
     # directory where to save csv files:
-    data_dir = '../data/'
-
+    data_dir = '/usr/udo/data/'
     main(data_set='iiw', data_dir=data_dir, create_csv_lists=True)
     #main(data_set='mpi_sintel_shading', data_dir=data_dir,
     #     create_csv_lists=True)
     #main(data_set='mpi_sintel_complete', data_dir=data_dir,
     #     create_csv_lists=True)
     #main(data_set='mit', data_dir=data_dir, create_csv_lists=True)
+
