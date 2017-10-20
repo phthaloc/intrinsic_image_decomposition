@@ -384,7 +384,7 @@ def sintel_loss_fct(label_albedo, label_shading, prediction_albedo,
     # of them) etc (tf.summary.scalar())
     # (have a look at parameters that change over time (= training
     # steps))
-    tf.summary.scalar(name='loss_', # + lambda_str,
+    tf.summary.scalar(name='loss_' + lambda_str,
                       tensor=loss)
     return loss
 
