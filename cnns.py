@@ -62,8 +62,8 @@ os.environ["CUDA_VISIBLE_DEVICES"]="0"
 def train_network_sintel(log_dir, data_dir, path_inference_graph, 
                          checkpoint_path, restore_scope, image_shape, 
                          initial_learning_rate, loss_opt, batch_size, 
-                         num_epochs, display_step, save_step, nodes_name_dict, 
-                         dataset='sintel', is_sample=False, norm=True, 
+                         num_epochs, display_step, save_step, nodes_name_dict,
+                         logger, dataset='sintel', is_sample=False, norm=True, 
                          plot_inference_graph=False):
     """
     :param log_dir: path to directory for saving summary/log files
@@ -124,10 +124,6 @@ def train_network_sintel(log_dir, data_dir, path_inference_graph,
     :type plot_inference_graph: boolean
     """
     ############################################################################
-    # create logger (write to file and stdout):
-    logger = ghelp.create_logger(filename=log_dir + 'training.log')
-    logger.debug('Python version: \n    ' + sys.version + 
-                 '\n    Tensorflow version: ' + tf.__version__)
     logger.info('Training on images of shape: {}'.format(image_shape))
     logger.info('Training on [0, 1] normalized pixel values: {}'.format(norm))
     logger.info('Initial learning rate: {}'.format(initial_learning_rate))
@@ -370,7 +366,6 @@ def train_network_sintel(log_dir, data_dir, path_inference_graph,
     config = tf.ConfigProto(device_count = {'GPU': 1},
                             intra_op_parallelism_threads=4
     #                        allow_soft_placement = True,
-    #                        intra_op_parallelism_threads=3,
     #                        log_device_placement=False
                            )
     with tf.Session(config=config) as sess: 
@@ -586,8 +581,9 @@ def train_network_sintel(log_dir, data_dir, path_inference_graph,
 def train_network_iiw(log_dir, data_dir, path_inference_graph, checkpoint_path,
                       restore_scope, image_shape, initial_learning_rate, 
                       loss_opt, lambda_loss, batch_size, num_epochs, 
-                      display_step, save_step, nodes_name_dict, dataset='iiw', 
-                      is_sample=False, norm=True, plot_inference_graph=False):
+                      display_step, save_step, nodes_name_dict, logger, 
+                      dataset='iiw', is_sample=False, norm=True, 
+                      plot_inference_graph=False):
     """
     :param log_dir: path to directory for saving summary/log files
     :type log_dir: str
@@ -647,10 +643,6 @@ def train_network_iiw(log_dir, data_dir, path_inference_graph, checkpoint_path,
     :type plot_inference_graph: boolean
     """
     ############################################################################
-    # create logger (write to file and stdout):
-    logger = ghelp.create_logger(filename=log_dir + 'training.log')
-    logger.debug('Python version: \n    ' + sys.version + 
-                 '\n    Tensorflow version: ' + tf.__version__)
     logger.info('Training on images of shape: {}'.format(image_shape))
     logger.info('Training on [0, 1] normalized pixel values: {}'.format(norm))
     logger.info('Initial learning rate: {}'.format(initial_learning_rate))
@@ -770,6 +762,7 @@ def train_network_iiw(log_dir, data_dir, path_inference_graph, checkpoint_path,
         
         # use slim optimizaton op only if a batch normalization is in the 
         # tf graph.
+        use_slim_train_opt = False
         for v in graph.as_graph_def().node:
             if 'batchnorm' in v.name.lower():
                 use_slim_train_opt = True
@@ -882,7 +875,6 @@ def train_network_iiw(log_dir, data_dir, path_inference_graph, checkpoint_path,
     config = tf.ConfigProto(device_count = {'GPU': 1},
                             intra_op_parallelism_threads=3
     #                        allow_soft_placement = True,
-    #                        intra_op_parallelism_threads=3,
     #                        log_device_placement=False
                            )
     with tf.Session(config=config) as sess: 
@@ -1086,14 +1078,21 @@ def train_network_iiw(log_dir, data_dir, path_inference_graph, checkpoint_path,
     logger.info('Finished training.')
 
 
-# In[3]:
+# In[6]:
 
 
 def train_network(dataset, **kwargs):
+    # create logger (write to file and stdout):
+    logger = ghelp.create_logger(filename=kwargs['log_dir'] + 'training.log')
+    logger.debug('Python version: \n    ' + sys.version + 
+                 '\n    Tensorflow version: ' + tf.__version__)
+    logger.info('Parameter summary: \n' + 
+                "\n".join("{}: {}".format(k, v) for k, v in params.items()))
+    
     if dataset=='iiw':
-        return train_network_iiw(**kwargs)
+        return train_network_iiw(logger=logger, **kwargs)
     elif dataset=='sintel':
-        return train_network_sintel(**kwargs)
+        return train_network_sintel(logger=logger, **kwargs)
     else:
         raise ValueError("Invalid dataset! Enter one of the " +
                          "following: ('iiw', 'sintel')")
@@ -1170,6 +1169,7 @@ def train_network(dataset, **kwargs):
 #           'plot_inference_graph': False
 #          }
 
+
 # # sintel_slim_vgg16_deconv_decoder:
 # # this model uses a pre-trained vgg16 as encoder and a decoder
 # # which basically consists of deconvolution functions as upscaling functions
@@ -1202,6 +1202,7 @@ def train_network(dataset, **kwargs):
 #           'norm': True,
 #           'plot_inference_graph': False
 #          }
+
 
 # # sintel_slim_resnet_v1_50_deconv_decoder:
 # # this model uses a pre-trained resnet_50 as encoder and a decoder 
@@ -1236,6 +1237,40 @@ def train_network(dataset, **kwargs):
 #           'plot_inference_graph': False
 #          }
 
+
+# # sintel_slim_resnet_v1_50_narihira2015:
+# # this model uses a pre-trained resnet_50 as encoder and a decoder which
+# # constists of 2 scales (main upscaling function: deconvolution). 
+# # This decoder has basically the proposed structure of narihira2015:
+# nodes_name_dict = {'input': 'input:0',
+#                    'output_albedo': 'decoder/deconv7_albedo/BiasAdd:0',
+#                    'output_shading': 'decoder/deconv7_shading/BiasAdd:0'}
+# # download checkpoint files:
+# url = "http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz"
+# checkpoints_dir = './models/slim/checkpoints'
+# print('If not available download resnet_v1_50 ckpt files to ' + checkpoints_dir)
+# download.maybe_download_and_extract(url=url, 
+#                                     download_dir=checkpoints_dir,
+#                                     print_download_progress=True)
+# params = {'log_dir': 'logs/sintel/slim_resnet_v1_50_narihira2015/test/',
+#           'data_dir': '/usr/udo/data/',
+#           'path_inference_graph': 'models/slim/graphs/resnet_v1_50_narihira2015/tfmodel_inference.meta',
+#           'checkpoint_path': 'models/slim/checkpoints/resnet_v1_50.ckpt',
+#           'restore_scope': 'resnet_v1_50',
+#           'image_shape': [320, 320, 3],
+#           'initial_learning_rate': 5e-4,  # hyper param
+#           'loss_opt': 'l1',
+#           'batch_size': 16,  # hyper param
+#           'num_epochs': 100,  # hyper param 
+#           'display_step': 20,
+#           'save_step': 100,
+#           'nodes_name_dict': nodes_name_dict,
+#           'dataset': 'sintel',
+#           'is_sample': False,
+#           'norm': True,
+#           'plot_inference_graph': False
+#          }
+
 ################################################################################
 ################################################################################
 # iiw dataset parameters:
@@ -1254,7 +1289,7 @@ def train_network(dataset, **kwargs):
 # download.maybe_download_and_extract(url=url, 
 #                                     download_dir=checkpoints_dir,
 #                                     print_download_progress=True)
-# params = {'log_dir': 'logs/iiw/slim_resnet_v1_50_deconv_decoder/test/',
+# params = {'log_dir': 'logs/iiw/slim_resnet_v1_50_deconv_decoder/norm_l1_10mhdl/test/',
 #           'data_dir': '/usr/udo/data/',
 #           'path_inference_graph': 'models/slim/graphs/resnet_v1_50/tfmodel_inference.meta',
 #           'checkpoint_path': 'models/slim/checkpoints/resnet_v1_50.ckpt',
@@ -1271,8 +1306,81 @@ def train_network(dataset, **kwargs):
 #           'dataset': 'iiw',  # in iiw dataset min image height/width = 340 px
 #           'is_sample': False,
 #           'norm': True,
-#           'plot_inference_graph': True
+#           'plot_inference_graph': False
 #          }
+
+
+# # iiw_slim_vgg16_deconv_decoder:
+# # this model uses a pre-trained vgg16 as encoder and a decoder
+# # which basically consists of deconvolution functions as upscaling functions
+# # (it uses only 1 scale):
+# nodes_name_dict = {'input': 'input:0',
+#                    'output_albedo': 'scale2/deconv6_s2_albedo/BiasAdd:0',
+#                    'output_shading': 'scale2/deconv6_s2_shading/BiasAdd:0'}
+# # download checkpoint files:
+# url = "http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz"
+# checkpoints_dir = './models/slim/checkpoints'
+# print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
+# download.maybe_download_and_extract(url=url, 
+#                                     download_dir=checkpoints_dir,
+#                                     print_download_progress=True)
+# params = {'log_dir': 'logs/iiw/slim_vgg16_deconv_decoder/norm_l1_10mhdl/test/',
+#           'data_dir': '/usr/udo/data/',
+#           'path_inference_graph': 'models/slim/graphs/vgg16/tfmodel_inference.meta',
+#           'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
+#           'restore_scope': 'vgg_16',
+#           'image_shape': [320, 320, 3],
+#           'initial_learning_rate': 5e-4,  # hyper param
+#           'loss_opt': 'l1_mhdl',
+#           'lambda_loss': 1.0,
+#           'batch_size': 16,  # hyper param
+#           'num_epochs': 20,  # hyper param 
+#           'display_step': 20,
+#           'save_step': 100,
+#           'nodes_name_dict': nodes_name_dict,
+#           'dataset': 'iiw',
+#           'is_sample': False,
+#           'norm': True,
+#           'plot_inference_graph': False
+#          }
+
+
+# # iiw_slim_vgg16_narihira2015:
+# # this model uses a pre-trained vgg16 as encoder and a decoder which
+# # constists of 2 scales (main upscaling function: deconvolution). 
+# # This decoder has basically the proposed structure of narihira2015:
+# nodes_name_dict = {'input': 'input:0',
+#                    'output_albedo': 'scale2/deconv6_s2_albedo/BiasAdd:0',
+#                    'output_shading': 'scale2/deconv6_s2_shading/BiasAdd:0'}
+# # download checkpoint files:
+# url = "http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz"
+# checkpoints_dir = './models/slim/checkpoints'
+# print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
+# download.maybe_download_and_extract(url=url, 
+#                                     download_dir=checkpoints_dir,
+#                                     print_download_progress=True)
+# params = {'log_dir': 'logs/iiw/slim_vgg16_narihira2015/norm_l1_10mhdl/test/',
+#           'data_dir': '/usr/udo/data/',
+#           'path_inference_graph': 'models/slim/graphs/vgg16_narihira2015/tfmodel_inference.meta',
+#           'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
+#           'restore_scope': 'vgg_16',
+#           'image_shape': [320, 320, 3],
+#           'initial_learning_rate': 5e-4,  # hyper param
+#           'loss_opt': 'l1_mhdl',
+#           'lambda_loss': 1.0,
+#           'batch_size': 16,  # hyper param
+#           'num_epochs': 20,  # hyper param 
+#           'display_step': 20,
+#           'save_step': 100,
+#           'nodes_name_dict': nodes_name_dict,
+#           'dataset': 'iiw',
+#           'is_sample': False,
+#           'norm': True,
+#           'plot_inference_graph': False
+#          }
+
+################################################################################
+################################################################################
 
 
 # In[ ]:
