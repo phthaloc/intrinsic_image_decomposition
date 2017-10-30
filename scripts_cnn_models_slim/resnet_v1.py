@@ -279,6 +279,7 @@ resnet_v1_50.default_image_size = resnet_v1.default_image_size
 
 is_training=tf.placeholder(dtype=tf.bool, name='is_training')
 
+
 def resnet_v1_50_custom(net, is_training=is_training, end_points=None):
     # TODO: this function is user defined. write it to a separate script!!!!
     """
@@ -377,6 +378,124 @@ def resnet_v1_50_custom(net, is_training=is_training, end_points=None):
                     # create new dict:
                     end_points = slim.utils.convert_collection_to_dict(end_points_collection)
                 return net_albedo, net_shading, end_points
+
+
+def resnet_v1_50_2scale_custom(inputs, net, is_training=is_training,
+                               end_points=None):
+    """
+    :param inputs:
+    :param net:
+    :return:
+    """
+    weights_initializer = tf.contrib.layers.xavier_initializer(uniform=False,
+                                                               seed=None,
+                                                               dtype=tf.float32)
+
+    with tf.variable_scope(name_or_scope='decoder', default_name='decoder',
+                           values=[net]) as sc:
+        end_points_collection = sc.name + '_end_points'
+        # Collect outputs for conv2d, fully_connected and max_pool2d.
+        with slim.arg_scope([slim.conv2d, slim.fully_connected, slim.max_pool2d,
+                             slim.conv2d_transpose],
+                            outputs_collections=end_points_collection):
+            with slim.arg_scope([slim.batch_norm], is_training=is_training):
+
+                f, s, p, k_in, k_out, name = [16, 8, 'SAME', 512, 256,
+                                              'deconv1']
+                net = slim.conv2d_transpose(inputs=net, num_outputs=k_out,
+                                            kernel_size=[f, f], stride=s,
+                                            padding=p,
+                                            data_format='NHWC', trainable=True,
+                                            scope=name)
+
+                f, s, p, k_in, k_out, name = [1, 1, 'VALID', k_out, 64, 'conv2']
+                net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                  kernel_size=[f, f],
+                                  padding=p, scope=name,
+                                  weights_initializer=weights_initializer)
+
+                ################################################################
+                # scale 2:
+                # if is_2scales:
+                f, s, p, k_in, k_out, name = [10, 2, 'SAME', 3, 96, 'conv1_s2']
+                net_s2 = slim.conv2d(inputs=inputs, num_outputs=k_out,
+                                     kernel_size=[f, f], padding=p, stride=s,
+                                     scope=name,
+                                     weights_initializer=weights_initializer)
+
+                f, s, p, name = [2, 2, 'SAME', 'pool1_s2']
+                net_s2 = slim.max_pool2d(inputs=net_s2, kernel_size=[f, f],
+                                         stride=s, padding=p, scope=name)
+
+                net = tf.concat(values=[net_s2, net], axis=-1, name='concat')
+
+                f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out + 64, 64, 'conv2_s2']
+
+
+                # scale 2:
+                #f, s, p, k_in, k_out, name = [5, 1, 'SAME', 64, 64, 'conv3']
+                net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                  kernel_size=[f, f],
+                                  padding=p, stride=s, scope=name,
+                                  weights_initializer=weights_initializer)
+
+                f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv4']
+                net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                  kernel_size=[f, f],
+                                  padding=p, stride=s, scope=name,
+                                  weights_initializer=weights_initializer)
+
+                f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64, 'conv5']
+                net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                  kernel_size=[f, f],
+                                  padding=p, stride=s, scope=name,
+                                  weights_initializer=weights_initializer)
+
+                # albedo:
+                f, s, p, k_in, k_out, name = [5, 1, 'SAME', k_out, 64,
+                                              'conv6_albedo']
+                net_albedo = slim.conv2d(inputs=net, num_outputs=k_out,
+                                         kernel_size=[f, f], padding=p,
+                                         stride=s,
+                                         scope=name,
+                                         weights_initializer=weights_initializer)
+
+                f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3,
+                                              'deconv7_albedo']
+                net_albedo = slim.conv2d_transpose(inputs=net_albedo,
+                                                   num_outputs=k_out,
+                                                   kernel_size=[f, f],
+                                                   stride=s, padding=p,
+                                                   data_format='NHWC',
+                                                   trainable=True, scope=name,
+                                                   activation_fn=None)
+
+                # shading:
+                f, s, p, k_in, k_out, name = [5, 1, 'SAME', 64, 64,
+                                              'conv6_shading']
+                net_shading = slim.conv2d(inputs=net, num_outputs=k_out,
+                                          kernel_size=[f, f], padding=p,
+                                          stride=s,
+                                          scope=name,
+                                          weights_initializer=weights_initializer)
+
+                f, s, p, k_in, k_out, name = [8, 4, 'SAME', k_out, 3,
+                                              'deconv7_shading']
+                net_shading = slim.conv2d_transpose(inputs=net_shading,
+                                                    num_outputs=k_out,
+                                                    kernel_size=[f, f],
+                                                    stride=s, padding=p,
+                                                    data_format='NHWC',
+                                                    trainable=True, scope=name,
+                                                    activation_fn=None)
+                if end_points:
+                    # append (at end) of existing ordered dict:
+                    end_points.update(slim.utils.convert_collection_to_dict(end_points_collection))
+                else:
+                    # create new dict:
+                    end_points = slim.utils.convert_collection_to_dict(end_points_collection)
+                return net_albedo, net_shading, end_points
+
 
 def resnet_v1_101(inputs,
                   num_classes=None,
