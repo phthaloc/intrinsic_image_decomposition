@@ -10,8 +10,9 @@ Deep Intrinsic Image Decomposition:
 
 ### How do I get set up? ###
 
-* after cloning the repository first create the needed data sets with data_structure.py.
-This script creates a data/ sub-directory where the data and csv files (training, validation, testing set definitions) are stored.
+* clone the repository 
+* create the needed data sets with data_structure.py.
+This script creates by default a data/ sub-directory where the data and csv files (training, validation, testing set definitions) are stored.
 * own models are defined in cnn_model.py
 * utility (helper) functions are defined in module utility
 * jupyter file cnns.ipynb creates complete models and trains them
