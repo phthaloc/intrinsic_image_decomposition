@@ -280,11 +280,14 @@ resnet_v1_50.default_image_size = resnet_v1.default_image_size
 is_training=tf.placeholder(dtype=tf.bool, name='is_training')
 
 
-def resnet_v1_50_custom(net, is_training=is_training, end_points=None):
-    # TODO: this function is user defined. write it to a separate script!!!!
+def resnet_v1_50_custom(net, is_training=is_training, end_points=None,
+                        reduced=False):
     """
     :param inputs:
     :param net:
+    :param reduced: if true it reduces number of parameters in network by
+    inserting a convolutional layer before the first upscaling deconvolution
+    layer
     :return:
     """
     weights_initializer = tf.contrib.layers.xavier_initializer(uniform=False,
@@ -300,7 +303,18 @@ def resnet_v1_50_custom(net, is_training=is_training, end_points=None):
                             outputs_collections=end_points_collection):
             with slim.arg_scope([slim.batch_norm], is_training=is_training):
 
-                f, s, p, k_in, k_out, name = [16, 8, 'SAME', 512, 256,
+                if reduced:
+                    f, s, p, k_in, k_out, name = [1, 1, 'VALID', 2048, 256, 'conv1']
+                    net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                      kernel_size=[f, f],
+                                      padding=p, scope=name,
+                                      weights_initializer=weights_initializer)
+                    k_out_new = 128
+                else:
+                    k_out = 2048
+                    k_out_new = 256
+
+                f, s, p, k_in, k_out, name = [16, 8, 'SAME', k_out, k_out_new,
                                               'deconv1']
                 net = slim.conv2d_transpose(inputs=net, num_outputs=k_out,
                                             kernel_size=[f, f], stride=s,
@@ -381,10 +395,13 @@ def resnet_v1_50_custom(net, is_training=is_training, end_points=None):
 
 
 def resnet_v1_50_2scale_custom(inputs, net, is_training=is_training,
-                               end_points=None):
+                               end_points=None, reduced=True):
     """
     :param inputs:
     :param net:
+    :param reduced: if true it reduces number of parameters in network by
+    inserting a convolutional layer before the first upscaling deconvolution
+    layer
     :return:
     """
     weights_initializer = tf.contrib.layers.xavier_initializer(uniform=False,
@@ -400,7 +417,18 @@ def resnet_v1_50_2scale_custom(inputs, net, is_training=is_training,
                             outputs_collections=end_points_collection):
             with slim.arg_scope([slim.batch_norm], is_training=is_training):
 
-                f, s, p, k_in, k_out, name = [16, 8, 'SAME', 512, 256,
+                if reduced:
+                    f, s, p, k_in, k_out, name = [1, 1, 'VALID', 2048, 256, 'conv1']
+                    net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                      kernel_size=[f, f],
+                                      padding=p, scope=name,
+                                      weights_initializer=weights_initializer)
+                    k_out_new = 128
+                else:
+                    k_out = 2048
+                    k_out_new = 256
+
+                f, s, p, k_in, k_out, name = [16, 8, 'SAME', k_out, k_out_new,
                                               'deconv1']
                 net = slim.conv2d_transpose(inputs=net, num_outputs=k_out,
                                             kernel_size=[f, f], stride=s,

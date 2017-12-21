@@ -204,11 +204,14 @@ def vgg_16(inputs,
 vgg_16.default_image_size = 224
 
 
-def vgg_16_custom(inputs, net, end_points=None, is_2scales=True):
+def vgg_16_custom(inputs, net, end_points=None, is_2scales=True, reduced=False):
     # TODO: this function is user defined. write it to a separate script!!!!
     """
     :param inputs:
     :param net:
+    :param reduced: if true it reduces number of parameters in network by
+    inserting a convolutional layer before the first upscaling deconvolution
+    layer
     :return:
     """
     weights_initializer = tf.contrib.layers.xavier_initializer(uniform=False,
@@ -222,7 +225,18 @@ def vgg_16_custom(inputs, net, end_points=None, is_2scales=True):
         with slim.arg_scope([slim.conv2d, slim.fully_connected, slim.max_pool2d,
                              slim.conv2d_transpose],
                             outputs_collections=end_points_collection) as asc:
-            f, s, p, k_in, k_out, name = [16, 8, 'SAME', 512, 256, 'deconv6']
+            if reduced:
+                f, s, p, k_in, k_out, name = [1, 1, 'VALID', 512, 128, 'conv6']
+                net = slim.conv2d(inputs=net, num_outputs=k_out,
+                                  kernel_size=[f, f],
+                                  padding=p, scope=name,
+                                  weights_initializer=weights_initializer)
+                k_out_new = 128
+            else:
+                k_out = 512
+                k_out_new = 256
+            f, s, p, k_in, k_out, name = [16, 8, 'SAME', k_out, k_out_new,
+                                          'deconv6']
             net = slim.conv2d_transpose(inputs=net, num_outputs=k_out,
                                         kernel_size=[f, f], stride=s, padding=p,
                                         data_format='NHWC', trainable=True,
