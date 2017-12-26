@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow.contrib import slim
+get_ipython().run_line_magic('matplotlib', 'inline')
 import matplotlib.pyplot as plt
 import input_queues as iq
 import cnn_model
@@ -1937,25 +1938,58 @@ def train_network(dataset, **kwargs):
 #          }
 
 
-# sintel_slim_resnet_v1_50_deconv_decoder_reduced:
-# this model uses a pre-trained resnet_50 as encoder and a decoder 
-# which basically consists of deconvolution functions as upscaling functions
-# (it uses only 1 scale):
+# # sintel_slim_resnet_v1_50_deconv_decoder_reduced:
+# # this model uses a pre-trained resnet_50 as encoder and a decoder 
+# # which basically consists of deconvolution functions as upscaling functions
+# # (it uses only 1 scale):
+# nodes_name_dict = {'input': 'input:0',
+#                    'output_albedo': 'decoder/deconv7_albedo/BiasAdd:0',
+#                    'output_shading': 'decoder/deconv7_shading/BiasAdd:0'}
+# # download checkpoint files:
+# url = "http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz"
+# checkpoints_dir = './models/slim/checkpoints'
+# print('If not available download resnet_v1_50 ckpt files to ' + checkpoints_dir)
+# download.maybe_download_and_extract(url=url, 
+#                                     download_dir=checkpoints_dir,
+#                                     print_download_progress=True)
+# params = {'log_dir': 'logs/sintel/slim_resnet_v1_50_deconv_decoder_reduced/test/',
+#           'data_dir': '/media/sdb/udo/data/',
+#           'path_inference_graph': 'models/slim/graphs/resnet_v1_50_reduced/tfmodel_inference.meta',
+#           'checkpoint_path': 'models/slim/checkpoints/resnet_v1_50.ckpt',
+#           'restore_scope': 'resnet_v1_50',
+#           'image_shape': [320, 320, 3],
+#           'initial_learning_rate': 5e-4,  # hyper param
+#           'loss_opt': 'l1',
+#           'batch_size': 16,  # hyper param
+#           'num_epochs': 100,  # hyper param 
+#           'display_step': 20,
+#           'save_step': 100,
+#           'nodes_name_dict': nodes_name_dict,
+#           'dataset': 'sintel',
+#           'is_sample': False,
+#           'norm': True,
+#           'plot_inference_graph': False
+#          }
+
+# sintel_slim_vgg16_narihira2015_reduced_bn:
+# this model uses a pre-trained vgg16 as encoder and a decoder which
+# constists of 2 scales (main upscaling function: deconvolution). 
+# This decoder has basically the proposed structure of narihira2015:
 nodes_name_dict = {'input': 'input:0',
-                   'output_albedo': 'decoder/deconv7_albedo/BiasAdd:0',
-                   'output_shading': 'decoder/deconv7_shading/BiasAdd:0'}
+                   'output_albedo': 'scale2/deconv6_s2_albedo/BiasAdd:0',
+                   'output_shading': 'scale2/deconv6_s2_shading/BiasAdd:0'}
 # download checkpoint files:
-url = "http://download.tensorflow.org/models/resnet_v1_50_2016_08_28.tar.gz"
+url = "http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz"
 checkpoints_dir = './models/slim/checkpoints'
-print('If not available download resnet_v1_50 ckpt files to ' + checkpoints_dir)
+print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
 download.maybe_download_and_extract(url=url, 
                                     download_dir=checkpoints_dir,
                                     print_download_progress=True)
-params = {'log_dir': 'logs/sintel/slim_resnet_v1_50_deconv_decoder_reduced/1/',
+params = {'log_dir': 'logs/sintel/slim_vgg16_narihira2015_reduced_bn/test/',
           'data_dir': '/media/sdb/udo/data/',
-          'path_inference_graph': 'models/slim/graphs/resnet_v1_50_reduced/tfmodel_inference.meta',
-          'checkpoint_path': 'models/slim/checkpoints/resnet_v1_50.ckpt',
-          'restore_scope': 'resnet_v1_50',
+          'path_inference_graph': 'models/slim/graphs/vgg16_narihira2015/tfmodel_inference.meta',
+          'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
+          'restore_scope': 'vgg_16',
           'image_shape': [320, 320, 3],
           'initial_learning_rate': 5e-4,  # hyper param
           'loss_opt': 'l1',
@@ -1970,6 +2004,39 @@ params = {'log_dir': 'logs/sintel/slim_resnet_v1_50_deconv_decoder_reduced/1/',
           'plot_inference_graph': False
          }
 
+
+# sintel_slim_vgg16_deconv_decoder_reduced_bn:
+# this model uses a pre-trained vgg16 as encoder and a decoder
+# which basically consists of deconvolution functions as upscaling functions
+# (it uses only 1 scale):
+nodes_name_dict = {'input': 'input:0',
+                   'output_albedo': 'scale2/deconv6_s2_albedo/BiasAdd:0',
+                   'output_shading': 'scale2/deconv6_s2_shading/BiasAdd:0'}
+# download checkpoint files:
+url = "http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz"
+checkpoints_dir = './models/slim/checkpoints'
+print('If not available download vgg16 ckpt files to ' + checkpoints_dir)
+download.maybe_download_and_extract(url=url, 
+                                    download_dir=checkpoints_dir,
+                                    print_download_progress=True)
+params = {'log_dir': 'logs/sintel/slim_vgg16_deconv_decoder_reduced_bn/test/',
+          'data_dir': '/media/sdb/udo/data/',
+          'path_inference_graph': 'models/slim/graphs/vgg16/tfmodel_inference.meta',
+          'checkpoint_path': 'models/slim/checkpoints/vgg_16.ckpt',
+          'restore_scope': 'vgg_16',
+          'image_shape': [320, 320, 3],
+          'initial_learning_rate': 5e-4,  # hyper param
+          'loss_opt': 'l1',
+          'batch_size': 16,  # hyper param
+          'num_epochs': 100,  # hyper param 
+          'display_step': 2,
+          'save_step': 100,
+          'nodes_name_dict': nodes_name_dict,
+          'dataset': 'sintel',
+          'is_sample': False,
+          'norm': True,
+          'plot_inference_graph': False
+         }
 ################################################################################
 ################################################################################
 # iiw dataset parameters:
