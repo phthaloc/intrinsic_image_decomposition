@@ -495,10 +495,10 @@ def _prepare_indices(before, row, col, after, dims):
     """
     x0, x1, x2, x3 = np.meshgrid(before, row, col, after)
 
-    x_0 = tf.Variable(x0.reshape([-1]), name='x_0')
-    x_1 = tf.Variable(x1.reshape([-1]), name='x_1')
-    x_2 = tf.Variable(x2.reshape([-1]), name='x_2')
-    x_3 = tf.Variable(x3.reshape([-1]), name='x_3')
+    x_0 = tf.Variable(x0.reshape([-1]), name='x_0', trainable=False)
+    x_1 = tf.Variable(x1.reshape([-1]), name='x_1', trainable=False)
+    x_2 = tf.Variable(x2.reshape([-1]), name='x_2', trainable=False)
+    x_3 = tf.Variable(x3.reshape([-1]), name='x_3', trainable=False)
 
     summand2 = dims[3].value * x_2
     summand3 = 2 * dims[2].value * dims[3].value * x_0 * 2 * dims[1].value
@@ -589,6 +589,7 @@ def _unpool_as_conv(input_data,
     # Interleaving elements of the four feature maps:
     with tf.variable_scope('interleaving_elements'):
         dims = outputA.get_shape()
+        # new spatial dimensions:
         dim1 = dims[1] * 2
         dim2 = dims[2] * 2
 
@@ -651,10 +652,10 @@ def _unpool_as_conv(input_data,
                             scope='batch_norm')
     ############################################################################
     if relu:
+        pass
         Y = tf.nn.relu(Y, name='relu')
 
     return Y
-
 
 def up_project(input_data,
                kernel_size,
@@ -696,7 +697,7 @@ def up_project(input_data,
                                    use_batch_norm=True,
                                    bn_decay=bn_decay,
                                    bn_epsilon=bn_epsilon,
-                                   is_training=True)
+                                   is_training=is_training)
              with slim.arg_scope(upproject_arg_scope(weight_decay=0.0001,
                                                      batch_norm_decay=bn_decay,
                                                      batch_norm_epsilon=bn_epsilon,
@@ -724,7 +725,7 @@ def up_project(input_data,
                                               use_batch_norm=True,
                                               bn_decay=bn_decay,
                                               bn_epsilon=bn_epsilon,
-                                              is_training=True)
+                                              is_training=is_training)
 
         # sum branches
         output = tf.add_n([branch1_output, branch2_output],
@@ -733,6 +734,82 @@ def up_project(input_data,
         output = tf.nn.relu(output, name='relu')
         return output
 
+
+def _unpool_as_conv_udo(input_data,
+                        num_outputs,
+                        stride=1,
+                        relu=False,
+                        use_batch_norm=True,
+                        bn_decay=0.999,
+                        bn_epsilon=0.001,
+                        is_training=True):
+    """
+    Model upconvolutions (unpooling + convolution) as interleaving feature
+    maps of four convolutions (A,B,C,D). Building block for up-projections.
+
+    :param input_data:
+    :param num_outputs:
+    :param stride:
+    :param ReLU:
+    :param BN:
+    :param is_training:
+    :return:
+    """
+    with tf.variable_scope(name_or_scope='unpool_convs',
+                           default_name='unpool_convs',
+                           values=[input_data]):
+        with slim.arg_scope(upproject_arg_scope(weight_decay=0.0001,
+                                                batch_norm_decay=bn_decay,
+                                                batch_norm_epsilon=bn_epsilon,
+                                                batch_norm_scale=True,
+                                                activation_fn=None,
+                                                use_batch_norm=False,
+                                                is_training=is_training)):
+            ####################################################################
+            # Convolution A (3x3)
+            outputA = slim.conv2d(inputs=input_data,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[3, 3],
+                                  padding='SAME',
+                                  stride=stride,
+                                  scope='convA')
+            ####################################################################
+            # Convolution B (2x3)
+            # add zeros to input data: 1 row on top and one row on left and
+            # right of image respectively
+            padded_input_B = tf.pad(input_data,
+                                    [[0, 0], [1, 0], [1, 1], [0, 0]],
+                                    'CONSTANT')
+            outputB = slim.conv2d(inputs=padded_input_B,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[2, 3],
+                                  padding='VALID',
+                                  stride=stride,
+                                  scope='convB')
+            ####################################################################
+            # Convolution C (3x2)
+            padded_input_C = tf.pad(input_data,
+                                    [[0, 0], [1, 1], [1, 0], [0, 0]],
+                                    'CONSTANT')
+            outputC = slim.conv2d(inputs=padded_input_C,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[3, 2],
+                                  padding='VALID',
+                                  stride=stride,
+                                  scope='convC')
+            ####################################################################
+            # Convolution D (2x2)
+            padded_input_D = tf.pad(input_data,
+                                    [[0, 0], [1, 0], [1, 0], [0, 0]],
+                                    'CONSTANT')
+            outputD = slim.conv2d(inputs=padded_input_D,
+                                  num_outputs=num_outputs,
+                                  kernel_size=[2, 2],
+                                  padding='VALID',
+                                  stride=stride,
+                                  scope='convD')
+
+    return outputA, outputB, outputC, outputD
 
 if __name__ == "__main__":
     create_inference_graph(modelfunc=model_narihira2015, 
