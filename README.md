@@ -1,11 +1,33 @@
-# README #
+# Deep Intrinsic Image Decomposition #
 
-Deep Intrinsic Image Decomposition:
+### Introduction ###
+This project addresses the problem of decomposing a single RGB image into its
+intrinsic components -- the albedo or reflectance layer and the shading layer.
+We use state of the art deep learning architectures based on fully
+convolutional neural networks to predict the albedo and shading images in a
+regression learning task. The models are designed in such a way that the
+predictions can be made directly, without post-processing or similar additional
+steps.
 
-### What is this repository for? ###
+Since the intrinsic image decomposition problem is an ill-posed problem we have
+to impose some constraints to achieve a successful learning process.
+We do this by using labeled datasets in a supervised learning task. Therefore we
+heavily depend on the availability of these datasets.
+There are two suitable datasets publicly available: the synthetic [MPI Sintel dataset](http://sintel.is.tue.mpg.de/) and the
+[Intrinsic Images in the Wild dataset](http://opensurfaces.cs.cornell.edu/publications/intrinsic/) which contains real-world scenes.
 
-* Quick summary
-* 0.1
+Once our models have been trained they can be instantly employed and used for
+real-time predictions on images or videos.
+
+We compare different network architecture styles and loss functions.
+
+On the Sintel dataset we are able to deliver state-of-the-art results comparable
+or better than privious work. This approach shows that CNN-based models can be
+successfully trained on this synthetic dataset.
+
+On the Intrinsic Images in the Wild dataset we get less significant results.
+This seems to be because of the purely data-driven approach (sparse labeling) and the special
+construction of the loss function required for this dataset.
 
 
 ### How do I get set up? ###
