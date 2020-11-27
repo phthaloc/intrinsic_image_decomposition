@@ -40,7 +40,7 @@ i = a * s
 What are the benefits of decomposing images into its intrinsic layers?
 - easier interpretation of scenes
 - simple extraction of the geometry of an object
-- segmentation of objects is straight forward
+- segmentation of objects is straightforward
 - material recognition in images
 - resourfacing images
 
@@ -73,10 +73,28 @@ The labeled data looks like the figure below:
 
 <img src="imgs/bell2014_dataset-example.png" width=700em>
 
-In this real-world dataset we have a sparse labelling  
+It would be too time consuming to label all pixels by hand, that is why we only have sparse labeling in the IIW dataset.
+Training models on real worhd data is not as straightforward as training on synthetic data.
+The idea is to train the same model as before with the synthetic Sintel dataset.
+We have the same parameters (weights and biases) in both networks which allows us to train a network on both datasets.
+
+We only modify the training process by introducing a more advanced loss function.
+The loss function is now composed of two parts: One regression part (loss part 1) and one classification part (loss part 2).
+The first part of the loss function is a standard regression problem where we employ the definition of the intrinsic image decomposition.
+We could use a mean squared error loss function: `||i-a * s||` where i is the input image, a the albedo prodiction and s the shading layer prediction.
+Until now this is an ill-posed problem setting, so we have to impose some constaints on it.
+We do this in the second part of the loss function which is related to the sparse labels in form of pixel comparisons.
+We have to reshape the albedo output to be able to calculate this part of the loss function.
+First we have to take the mean over all channels in the albedo prediction.
+Then we identifiy the pixels which belong to an available label comparison `c_i`.
+We *flatten* the comparisons and apply a softmax function to all comparisons.
+From this we get the prediction for each comparison in a probabilistic way:
+`q_1` is the probability for point 1 beeing darker than point 2, `q_2` for point 2 beeing darker than point 1 and `q_0` for both points having about the same darkness in the albedo prediction.
+We compare these predictions with the human judgement labels in OHE form (`p_1`, `p_2`, `p_0`) and calculate the partial loss function (*cross-entropy*).
+Using backpropagation the error is passed through the network (dashed arrows in figure below).
+In this process the network is trained by updating its parameters (weights and biases).
 
 <img src="imgs/network_architecture_coarse_iiw.png" width=700em>
-
 
 ## Results
 <img src="imgs/predictions_best_model.png" width=700em>
