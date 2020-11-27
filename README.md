@@ -45,10 +45,10 @@ What are the benefits of decomposing images into its intrinsic layers?
 
 ## Models
 
-<img src="imgs/decoder_narihira2015_reduced.png" width=700em>
+<img src="imgs/decoder_narihira2015_reduced.png" width=400em>
 
 <img src="imgs/mpi_sintel_dataset-example.png" width=700em>
-<img src="imgs/network_architecture_coarse_sintel.png" width=700em>
+<img src="imgs/network_architecture_coarse_sintel.png" width=500em>
 
 
 <img src="imgs/bell2014_dataset-example.png" width=700em>
@@ -59,7 +59,7 @@ What are the benefits of decomposing images into its intrinsic layers?
 ## Results
 <img src="imgs/predictions_best_model.png" width=700em>
 
-<img src="imgs/predictions_comparison_sintelmodel_on_iiw.png" width=700em>
+<img src="imgs/predictions_comparison_sintelmodel_on_iiw.png" width=500em>
 
 
 ## How to use the scripts
