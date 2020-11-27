@@ -67,8 +67,13 @@ A sample model graph (with detailed decoder) is depicted below:
 
 ### IIW dataset and model
 
-[Intrinsic Images in the Wild dataset (IIW)](http://opensurfaces.cs.cornell.edu/publications/intrinsic/)
+The [Intrinsic Images in the Wild dataset](http://opensurfaces.cs.cornell.edu/publications/intrinsic/) is a real world dataset with indoor scenes.
+It is labeled by humans who compare pixels and decide which pixel in a pixe-to-pixel comparison has a higher intrinsic brightness.
+The labeled data looks like the figure below:
+
 <img src="imgs/bell2014_dataset-example.png" width=700em>
+
+In this real-world dataset we have a sparse labelling  
 
 <img src="imgs/network_architecture_coarse_iiw.png" width=700em>
 
