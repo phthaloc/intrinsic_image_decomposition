@@ -1,6 +1,6 @@
 # Deep Intrinsic Image Decomposition
 
-In the following we outline the project. For a mathematically more detailed description see the [whitepaper](whitepaper.pdf)
+In the following we outline the project. For a mathematically more detailed description see the [whitepaper](whitepaper.pdf).
 
 ## Abstract
 This project addresses the problem of decomposing a single RGB image into its
@@ -48,6 +48,7 @@ What are the benefits of decomposing images into its intrinsic layers?
 ## Datasets and Models
 ### Sintel dataset and model
 
+[MPI Sintel dataset](http://sintel.is.tue.mpg.de/)
 <img src="imgs/mpi_sintel_dataset-example.png" width=700em>
 
 <img src="imgs/network_architecture_coarse_sintel.png" width=500em>
@@ -56,6 +57,7 @@ What are the benefits of decomposing images into its intrinsic layers?
 
 ### IIW dataset and model
 
+[Intrinsic Images in the Wild dataset (IIW)](http://opensurfaces.cs.cornell.edu/publications/intrinsic/)
 <img src="imgs/bell2014_dataset-example.png" width=700em>
 
 <img src="imgs/network_architecture_coarse_iiw.png" width=700em>
@@ -84,4 +86,11 @@ This script creates by default a `data/` sub-directory where the data and csv fi
 * (script `loss_function_analysis.ipynb` analyzes loss functions of different models)
 * (The script `cnns_tf_input_queue.ipynb` imports inference graphs and extends them to training graphs)
 
+## Sources
+* D. J. Butler, J. Wul↵, G. B. Stanley, and M. J. Black. A naturalistic open source
+movie for optical flow evaluation. In A. Fitzgibbon et al. (Eds.), editor, European
+Conf. on Computer Vision (ECCV), Part IV, LNCS 7577, pages 611–625. Springer-
+Verlag, October 2012.
+* Sean Bell, Kavita Bala, and Noah Snavely. Intrinsic images in the wild. ACM Trans-
+actions on Graphics (SIGGRAPH 2014), 33(4), 2014.
 
