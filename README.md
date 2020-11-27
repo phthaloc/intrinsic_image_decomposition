@@ -1,6 +1,6 @@
-# Deep Intrinsic Image Decomposition #
+# Deep Intrinsic Image Decomposition
 
-### Abstract ###
+## Abstract
 This project addresses the problem of decomposing a single RGB image into its
 intrinsic components -- the albedo or reflectance layer and the shading layer.
 We use state of the art deep learning architectures based on fully
@@ -29,7 +29,7 @@ On the Intrinsic Images in the Wild dataset we get less significant results.
 This seems to be because of the purely data-driven approach (sparse labeling) and the special
 construction of the loss function required for this dataset.
 
-### Introduction ###
+## Introduction
 Intrinsic image decomposition is the decomposition of a color image `i` into its components albedo layer `a` (reflectance layer) and shading layer `s`. They are connected by a pixe-wise product
 ```
 i = a * s
@@ -43,7 +43,7 @@ What are the benefits of decomposing images into its intrinsic layers?
 - resourfacing images
 
 
-### Models
+## Models
 
 <img src="imgs/decoder_narihira2015_reduced.png" width=700em>
 
@@ -56,21 +56,27 @@ What are the benefits of decomposing images into its intrinsic layers?
 <img src="imgs/network_architecture_coarse_iiw.png" width=700em>
 
 
-### Results ###
+## Results
 <img src="imgs/predictions_best_model.png" width=700em>
 
 <img src="imgs/predictions_comparison_sintelmodel_on_iiw.png" width=700em>
 
 
-### How do I get set up? ###
+## How to use the scripts
 
 * clone the repository 
-* create the needed data sets with data_structure.py.
-This script creates by default a data/ sub-directory where the data and csv files (training, validation, testing set definitions) are stored.
-* own models are defined in cnn_model.py
-* utility (helper) functions are defined in module utility
-* jupyter file cnns.ipynb creates complete models and trains them
-    * it uses script input_queues.py where data input queues are created.
-    * (trained) tensorflow models and parameter data is saved in sub-directory logs/ (this sub-directory is created during training)
-* jupyter file data_analysis.ipynb analyses the data (image sizes etc.)
-*
+* create the needed data sets with script `util/data_structure.py`.
+This script creates by default a `data/` sub-directory where the data and csv files (training, validation, testing set definitions) are stored.
+* custom models are defined in `scripts_cnn_models_slim/cnn_model.py`
+* further utility (helper) functions are defined in sub-directory `util/`
+* the jupyter notebook `cnns.ipynb` (`cnns.py`) creates complete models and trains them
+    * it uses script `input_queues.py` where data input queues are created.
+    * (trained) tensorflow models and parameter data are saved in sub-directory `logs/` (this sub-directory is created during training)
+* jupyter file `data_analysis.ipynb` analyses the data (image sizes etc.)
+* `cnns_predict.ipynb` Inference script shows how to programm and setup a convolutional neural network using Tensorflow.
+* (script `create_models.ipynb` creates graphs and saves them to the appropriate location)
+* (`iiw_visualization_whdr_metrics.ipynb` analyzes the WHDR metric (for more information see `whitepaper.pdf`))
+* (script `loss_function_analysis.ipynb` analyzes loss functions of different models)
+* (The script `cnns_tf_input_queue.ipynb` imports inference graphs and extends them to training graphs)
+
+
