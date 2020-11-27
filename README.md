@@ -14,7 +14,7 @@ to impose some constraints to achieve a successful learning process.
 We do this by using labeled datasets in a supervised learning task. Therefore we
 heavily depend on the availability of these datasets.
 There are two suitable datasets publicly available: the synthetic [MPI Sintel dataset](http://sintel.is.tue.mpg.de/) and the
-[Intrinsic Images in the Wild dataset](http://opensurfaces.cs.cornell.edu/publications/intrinsic/) which contains real-world scenes.
+[Intrinsic Images in the Wild dataset (IIW)](http://opensurfaces.cs.cornell.edu/publications/intrinsic/) which contains real-world scenes.
 
 Once our models have been trained they can be instantly employed and used for
 real-time predictions on images or videos.
@@ -43,13 +43,16 @@ What are the benefits of decomposing images into its intrinsic layers?
 - resourfacing images
 
 
-## Models
+## Datasets and Models
+### Sintel dataset and model
+
+<img src="imgs/mpi_sintel_dataset-example.png" width=700em>
+
+<img src="imgs/network_architecture_coarse_sintel.png" width=500em>
 
 <img src="imgs/decoder_narihira2015_reduced.png" width=400em>
 
-<img src="imgs/mpi_sintel_dataset-example.png" width=700em>
-<img src="imgs/network_architecture_coarse_sintel.png" width=500em>
-
+### IIW dataset and model
 
 <img src="imgs/bell2014_dataset-example.png" width=700em>
 
