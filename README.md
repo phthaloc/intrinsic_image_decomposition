@@ -62,6 +62,7 @@ The following images shows a draft of the model architecture:
 <img src="imgs/network_architecture_coarse_sintel.png" width=500em>
 
 A sample model graph (with detailed decoder) is depicted below:
+
 <img src="imgs/decoder_narihira2015_reduced.png" width=400em>
 
 ### IIW dataset and model
