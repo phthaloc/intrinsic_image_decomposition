@@ -48,9 +48,14 @@ What are the benefits of decomposing images into its intrinsic layers?
 ## Datasets and Models
 ### Sintel dataset and model
 
-[MPI Sintel dataset](http://sintel.is.tue.mpg.de/)
+The [MPI Sintel dataset](http://sintel.is.tue.mpg.de/) is an artificial dataset extracted from the short movie Sintel.
+The dataset contains (animated) images and the ground truth albedo and shading images.
+An example is visualized below:
+
 <img src="imgs/mpi_sintel_dataset-example.png" width=700em>
 
+Since we have dense labels we can compare albedo/shading predictions pixel-wise with their corresponding labels.
+We use a encoder-decoder network with a pretrained encoder, like ResNet50 (transfer learning) and a decoder which uses upscaling thechniques like deconvolution layers.
 <img src="imgs/network_architecture_coarse_sintel.png" width=500em>
 
 <img src="imgs/decoder_narihira2015_reduced.png" width=400em>
@@ -87,10 +92,9 @@ This script creates by default a `data/` sub-directory where the data and csv fi
 * (The script `cnns_tf_input_queue.ipynb` imports inference graphs and extends them to training graphs)
 
 ## Sources
-* D. J. Butler, J. Wul↵, G. B. Stanley, and M. J. Black. A naturalistic open source
+* D. J. Butler, J. Wul, G. B. Stanley, and M. J. Black. A naturalistic open source
 movie for optical flow evaluation. In A. Fitzgibbon et al. (Eds.), editor, European
 Conf. on Computer Vision (ECCV), Part IV, LNCS 7577, pages 611–625. Springer-
 Verlag, October 2012.
-* Sean Bell, Kavita Bala, and Noah Snavely. Intrinsic images in the wild. ACM Trans-
-actions on Graphics (SIGGRAPH 2014), 33(4), 2014.
+* Sean Bell, Kavita Bala, and Noah Snavely. Intrinsic images in the wild. ACM Transactions on Graphics (SIGGRAPH 2014), 33(4), 2014.
 
