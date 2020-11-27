@@ -43,15 +43,18 @@ What are the benefits of decomposing images into its intrinsic layers?
 - resourfacing images
 
 
-<img src="imgs/bell2014_dataset-example.png" width=700em>
+### Models
 
 <img src="imgs/decoder_narihira2015_reduced.png" width=700em>
 
 <img src="imgs/mpi_sintel_dataset-example.png" width=700em>
+<img src="imgs/network_architecture_coarse_sintel.png" width=700em>
+
+
+<img src="imgs/bell2014_dataset-example.png" width=700em>
 
 <img src="imgs/network_architecture_coarse_iiw.png" width=700em>
 
-<img src="imgs/network_architecture_coarse_sintel.png" width=700em>
 
 ### Results ###
 <img src="imgs/predictions_best_model.png" width=700em>
