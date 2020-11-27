@@ -1,5 +1,7 @@
 # Deep Intrinsic Image Decomposition
 
+In the following we outline the project. For a mathematically more detailed description see the [whitepaper](whitepaper.de)
+
 ## Abstract
 This project addresses the problem of decomposing a single RGB image into its
 intrinsic components -- the albedo or reflectance layer and the shading layer.
