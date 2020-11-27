@@ -7,13 +7,13 @@ Module that contains layers for creating CNNs.
 import tensorflow as tf
 import nn_helpers as nnhelp
 
-__author__ = "Udo Dehm"
+__author__ = "ud"
 __copyright__ = "Copyright 2017"
-__credits__ = ["Udo Dehm"]
+__credits__ = ["phthalo@mailbox.org"]
 __license__ = ""
 __version__ = "0.1"
-__maintainer__ = "Udo Dehm"
-__email__ = "udo.dehm@mailbox.org"
+__maintainer__ = "ud"
+__email__ = "phthalo@mailbox.org"
 __status__ = "Development"
 
 

@@ -10,15 +10,14 @@ import math
 import tensorflow as tf
 from tensorflow.python.ops import random_ops
 
-__author__ = "Udo Dehm"
+__author__ = "ud"
 __copyright__ = "Copyright 2017"
-__credits__ = ["Udo Dehm"]
+__credits__ = ["phthalo@mailbox.org"]
 __license__ = ""
 __version__ = "0.1"
-__maintainer__ = "Udo Dehm"
-__email__ = "udo.dehm@mailbox.org"
+__maintainer__ = "ud"
+__email__ = "phthalo@mailbox.org"
 __status__ = "Development"
-
 
 __all__ = ['_xavier_msra', 'xavier_msra_initializer',
            'xavier_msra_initializer_conv2d']
