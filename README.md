@@ -1,6 +1,6 @@
 # Deep Intrinsic Image Decomposition #
 
-### Introduction ###
+### Abstract ###
 This project addresses the problem of decomposing a single RGB image into its
 intrinsic components -- the albedo or reflectance layer and the shading layer.
 We use state of the art deep learning architectures based on fully
@@ -29,6 +29,18 @@ On the Intrinsic Images in the Wild dataset we get less significant results.
 This seems to be because of the purely data-driven approach (sparse labeling) and the special
 construction of the loss function required for this dataset.
 
+### Introduction ###
+Intrinsic image decomposition is the decomposition of a color image `i` into its components albedo layer `a` (reflectance layer) and shading layer `s`. They are connected by a pixe-wise product
+```
+i = a * s
+```
+
+What are the benefits of decomposing images into its intrinsic layers?
+- easier interpretation of scenes
+- simple extraction of the geometry of an object
+- segmentation of objects is straight forward
+- material recognition in images
+- resourfacing images
 
 ### How do I get set up? ###
 
