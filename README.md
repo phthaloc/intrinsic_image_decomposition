@@ -56,6 +56,7 @@ An example is visualized below:
 
 Since we have dense labels we can compare albedo/shading predictions pixel-wise with their corresponding labels.
 We use a encoder-decoder network with a pretrained encoder, like ResNet50 (transfer learning) and a decoder which uses upscaling thechniques like deconvolution layers.
+The problem can be described as a regression deep learning model with mean squared error loss function.
 <img src="imgs/network_architecture_coarse_sintel.png" width=500em>
 
 <img src="imgs/decoder_narihira2015_reduced.png" width=400em>
