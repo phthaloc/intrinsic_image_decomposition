@@ -96,6 +96,8 @@ In this process the network is trained by updating its parameters (weights and b
 
 <img src="imgs/network_architecture_coarse_iiw.png" width=700em>
 
+A mathematically more comprehensive explanation is given in the [whitepaper](whitepaper.pdf).
+
 ## Results
 <img src="imgs/predictions_best_model.png" width=700em>
 
