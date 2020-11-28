@@ -99,6 +99,11 @@ In this process the network is trained by updating its parameters (weights and b
 A mathematically more comprehensive explanation is given in the [whitepaper](whitepaper.pdf).
 
 ## Results
+
+The results we achieve by training our models are at state-of-the-art compared to literature values.
+With our best model we achieve a MSE loss function value for the albedo layer `L_2=0.0369` and for the shading layer `L_2=0.0187`.
+A visualization of our results on some test set data can be seen below:
+
 <img src="imgs/predictions_best_model.png" width=700em>
 
 <img src="imgs/predictions_comparison_sintelmodel_on_iiw.png" width=500em>
