@@ -103,6 +103,7 @@ A mathematically more comprehensive explanation is given in the [whitepaper](whi
 
 <img src="imgs/predictions_comparison_sintelmodel_on_iiw.png" width=500em>
 
+For a more detailed discussion of results (loss function evaluations and so on) see [whitepaper](whitepaper.pdf).
 
 ## How to use the scripts
 
