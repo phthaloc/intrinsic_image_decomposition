@@ -106,9 +106,14 @@ A visualization of our results on some test set data can be seen below:
 
 <img src="imgs/predictions_best_model.png" width=700em>
 
+Applying the model which was trained on the synthetic dataset, on the real-world IIW dataset delivers some accurate results.
+The following image shows some of the results. Especially the images in the first and last rows achieve an accurate decomposition level:
+
 <img src="imgs/predictions_comparison_sintelmodel_on_iiw.png" width=500em>
 
-For a more detailed discussion of results (loss function evaluations and so on) see [whitepaper](whitepaper.pdf).
+Continuing training of our models on the real-world IIW dataset leads to some problems.
+These problems are described in more detail in the [whitepaper](whitepaper.pdf).
+There you can find a more detailed discussion of results (loss function evaluations and so on), too.
 
 ## How to use the scripts
 
